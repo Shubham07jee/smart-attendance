@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import * as XLSX from "xlsx";
-import { cloudConfigured } from "./supabase";
+import { cloudConfigured, supabase } from "./supabase";
+import type { User } from "@supabase/supabase-js";
 
 type Status = "Present" | "Absent" | "Late" | "Excused";
 type Student = { id: string; name: string; roll: string; email?: string; className: string };
@@ -28,7 +29,14 @@ const initialStudents: Student[] = [
   { id: "s10", name: "Priya Singh", roll: "CE-010", email: "priya@example.com", className: "Computer Engineering" },
 ];
 
-const today = new Date().toISOString().slice(0, 10);
+// Format dates in the user's local timezone (toISOString() can shift the day).
+const toLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const today = toLocalDate(new Date());
 const getStored = <T,>(key: string, fallback: T): T => {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; }
 };
@@ -39,7 +47,11 @@ const classes = ["Computer Engineering", "Mathematics", "Physics"];
 
 export default function App() {
   const [page, setPage] = useState("Overview");
-  const [students, setStudents] = useState<Student[]>(() => getStored("sa_students", initialStudents));
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [classIds, setClassIds] = useState<Record<string, string>>({});
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [students, setStudents] = useState<Student[]>(() => getStored("sa_students", []));
   const [records, setRecords] = useState<RecordEntry[]>(() => getStored("sa_records", []));
   const [sessions, setSessions] = useState<Session[]>(() => getStored("sa_sessions", []));
   const [selectedClass, setSelectedClass] = useState(classes[0]);
@@ -55,9 +67,58 @@ export default function App() {
   const [checkinRoll, setCheckinRoll] = useState("");
   const [sessionStudentClass, setSessionStudentClass] = useState(classes[0]);
 
-  useEffect(() => saveStored("sa_students", students), [students]);
-  useEffect(() => saveStored("sa_records", records), [records]);
+  useEffect(() => { if (!authUser) saveStored("sa_students", students); }, [students, authUser]);
+  useEffect(() => { if (!authUser) saveStored("sa_records", records); }, [records, authUser]);
   useEffect(() => saveStored("sa_sessions", sessions), [sessions]);
+
+  useEffect(() => {
+    if (!supabase) { setAuthLoading(false); return; }
+    supabase.auth.getSession().then(({ data }) => { setAuthUser(data.session?.user ?? null); setAuthLoading(false); });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setAuthUser(session?.user ?? null));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !authUser) {
+      if (!authUser) {
+        setStudents([]);
+        setRecords([]);
+        setClassIds({});
+      }
+      return;
+    }
+    const client = supabase;
+    let cancelled = false;
+    const loadCloudData = async () => {
+      setCloudLoading(true);
+      try {
+        const existing = await client.from("classes").select("id,name").eq("teacher_id", authUser.id);
+        if (existing.error) throw existing.error;
+        const ids: Record<string, string> = Object.fromEntries((existing.data ?? []).map((row: any) => [row.name, row.id]));
+        for (const className of classes) {
+          if (!ids[className]) {
+            const inserted = await client.from("classes").insert({ teacher_id: authUser.id, name: className }).select("id,name").single();
+            if (inserted.error) throw inserted.error;
+            ids[className] = inserted.data.id;
+          }
+        }
+        const studentResult = await client.from("students").select("id,full_name,roll_number,email,class_id").eq("teacher_id", authUser.id);
+        if (studentResult.error) throw studentResult.error;
+        const attendanceResult = await client.from("attendance_records").select("id,student_id,class_id,attendance_date,status").eq("teacher_id", authUser.id);
+        if (attendanceResult.error) throw attendanceResult.error;
+        if (!cancelled) {
+          setClassIds(ids);
+          setStudents((studentResult.data ?? []).map((row: any) => ({ id: row.id, name: row.full_name, roll: row.roll_number, email: row.email ?? undefined, className: Object.keys(ids).find(name => ids[name] === row.class_id) ?? classes[0] })));
+          setRecords((attendanceResult.data ?? []).map((row: any) => ({ studentId: row.student_id, date: row.attendance_date, status: row.status as Status, className: Object.keys(ids).find(name => ids[name] === row.class_id) ?? classes[0] })));
+        }
+      } catch (error: any) { if (!cancelled) showCloudError(error.message || "Unable to load cloud data."); }
+      finally { if (!cancelled) setCloudLoading(false); }
+    };
+    void loadCloudData();
+    return () => { cancelled = true; };
+  }, [authUser]);
+
+  const showCloudError = (message: string) => { setToast(`Cloud error: ${message}`); window.setTimeout(() => setToast(""), 5000); };
 
   const classStudents = students.filter(s => s.className === selectedClass);
   const todayRecords = records.filter(r => r.date === date && r.className === selectedClass);
@@ -71,32 +132,43 @@ export default function App() {
   const filteredStudents = classStudents.filter(s => `${s.name} ${s.roll}`.toLowerCase().includes(search.toLowerCase()));
 
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
-  const mark = (studentId: string, status: Status) => {
-    setRecords(prev => {
-      const existing = prev.findIndex(r => r.studentId === studentId && r.date === date && r.className === selectedClass);
-      const entry = { studentId, date, status, className: selectedClass };
-      if (existing >= 0) { const next = [...prev]; next[existing] = entry; return next; }
-      return [...prev, entry];
-    });
-  };
-  const markAllPresent = () => {
-    const entries = classStudents.map(s => ({ studentId: s.id, date, status: "Present" as Status, className: selectedClass }));
-    setRecords(prev => [...prev.filter(r => !(r.date === date && r.className === selectedClass)), ...entries]);
-    showToast("Everyone marked present.");
-  };
-  const addStudent = () => {
-    if (!newName.trim() || !newRoll.trim()) { showToast("Please enter both name and roll number."); return; }
-    if (students.some(s => s.roll.toLowerCase() === newRoll.trim().toLowerCase() && s.className === selectedClass)) {
-      showToast("This roll number already exists in the class."); return;
+  const mark = async (studentId: string, status: Status) => {
+    const entry = { studentId, date, status, className: selectedClass };
+    if (authUser && supabase) {
+      const classId = classIds[selectedClass];
+      if (!classId) { showCloudError("Class is not ready yet. Please retry."); return; }
+      const result = await supabase.from("attendance_records").upsert({ teacher_id: authUser.id, class_id: classId, student_id: studentId, attendance_date: date, status, source: "manual", updated_at: new Date().toISOString() }, { onConflict: "student_id,attendance_date,class_id" });
+      if (result.error) { showCloudError(result.error.message); return; }
     }
-    setStudents(prev => [...prev, { id: crypto.randomUUID(), name: newName.trim(), roll: newRoll.trim(), className: selectedClass }]);
-    setNewName(""); setNewRoll(""); setShowAdd(false); showToast("Student added.");
+    setRecords(prev => { const existing = prev.findIndex(r => r.studentId === studentId && r.date === date && r.className === selectedClass); if (existing >= 0) { const next = [...prev]; next[existing] = entry; return next; } return [...prev, entry]; });
   };
-  const removeStudent = (id: string) => {
+  const markAllPresent = async () => {
+    const entries = classStudents.map(s => ({ studentId: s.id, date, status: "Present" as Status, className: selectedClass }));
+    if (authUser && supabase) {
+      const classId = classIds[selectedClass];
+      const result = await supabase.from("attendance_records").upsert(entries.map(e => ({ teacher_id: authUser.id, class_id: classId, student_id: e.studentId, attendance_date: date, status: e.status, source: "manual" })), { onConflict: "student_id,attendance_date,class_id" });
+      if (result.error) { showCloudError(result.error.message); return; }
+    }
+    setRecords(prev => [...prev.filter(r => !(r.date === date && r.className === selectedClass)), ...entries]); showToast("Everyone marked present.");
+  };
+  const addStudent = async () => {
+    if (!newName.trim() || !newRoll.trim()) { showToast("Please enter both name and roll number."); return; }
+    if (students.some(s => s.roll.toLowerCase() === newRoll.trim().toLowerCase() && s.className === selectedClass)) { showToast("This roll number already exists in the class."); return; }
+    let student: Student = { id: crypto.randomUUID(), name: newName.trim(), roll: newRoll.trim(), className: selectedClass };
+    if (authUser && supabase) {
+      const classId = classIds[selectedClass];
+      if (!classId) { showCloudError("Class is not ready yet. Please retry."); return; }
+      const result = await supabase.from("students").insert({ teacher_id: authUser.id, class_id: classId, full_name: student.name, roll_number: student.roll }).select("id,full_name,roll_number,email").single();
+      if (result.error) { showCloudError(result.error.message); return; }
+      student = { ...student, id: result.data.id, email: result.data.email ?? undefined };
+    }
+    setStudents(prev => [...prev, student]); setNewName(""); setNewRoll(""); setShowAdd(false); showToast("Student added.");
+  };
+  const removeStudent = async (id: string) => {
     const student = students.find(s => s.id === id);
     if (!student || !confirm(`Remove ${student.name} from this roster?`)) return;
-    setStudents(prev => prev.filter(s => s.id !== id));
-    showToast("Student removed.");
+    if (authUser && supabase) { const result = await supabase.from("students").delete().eq("id", id).eq("teacher_id", authUser.id); if (result.error) { showCloudError(result.error.message); return; } }
+    setStudents(prev => prev.filter(s => s.id !== id)); setRecords(prev => prev.filter(r => r.studentId !== id)); showToast("Student removed.");
   };
   const exportExcel = () => {
     const roster = students.map(s => ({ "Student name": s.name, "Roll number": s.roll, Class: s.className }));
@@ -132,7 +204,7 @@ export default function App() {
   const submitCheckin = () => {
     if (!activeSession) return;
     if (!activeSession.active || Date.now() > new Date(activeSession.expiresAt).getTime()) { showToast("This QR session has expired."); return; }
-    const st = students.find(s => s.className === activeSession.className && s.roll.toLowerCase() === checkinRoll.trim().toLowerCase() && s.name.toLowerCase() === checkinName.trim().toLowerCase());
+    const st = students.find(s => s.className === activeSession.className && s.roll.trim().toLowerCase() === checkinRoll.trim().toLowerCase() && s.name.trim().toLowerCase() === checkinName.trim().toLowerCase());
     if (!st) { showToast("Student name and roll number do not match the class roster."); return; }
     setRecords(prev => {
       if (prev.some(r => r.studentId === st.id && r.date === today && r.className === activeSession.className)) return prev;
@@ -149,10 +221,14 @@ export default function App() {
   const selectedCount = classStudents.length;
   const last7 = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const iso = d.toISOString().slice(0, 10);
+    const iso = toLocalDate(d);
     const rs = records.filter(r => r.date === iso && r.className === selectedClass && r.status === "Present");
     return { label: d.toLocaleDateString("en", { weekday: "short" }), count: rs.length };
   }), [records, selectedClass]);
+
+  if (authLoading) return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Checking your teacher account…</p></div></div>;
+  if (!supabase) return <div className="auth-screen"><div className="auth-card"><h1>Supabase setup required</h1><p>Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.local file, then restart Vite.</p></div></div>;
+  if (!authUser) return <AuthScreen />;
 
   return (
     <div className="app-shell">
@@ -160,11 +236,11 @@ export default function App() {
         <div className="brand"><div className="brand-mark"><GraduationCap size={22}/></div><div><strong>Attendly</strong><span>Teacher workspace</span></div></div>
         <div className="workspace-label">WORKSPACE</div>
         <nav>{navItems.map(item => { const Icon = item.icon; return <button key={item.name} className={`nav-item ${page === item.name ? "active" : ""}`} onClick={() => { setPage(item.name); setSidebarOpen(false); }}><Icon size={18}/><span>{item.name}</span>{item.name === "Attendance" && <span className="nav-count">{marked}</span>}</button>; })}</nav>
-        <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><strong>Need a hand?</strong><p>Quick guide to get started.</p><button onClick={() => showToast("Tip: select a class, mark attendance, then export your Excel report.")}>View guide <ArrowUpRight size={13}/></button></div></div><div className="profile"><div className="avatar teacher">SC</div><div className="profile-text"><strong>Teacher Demo</strong><span>Individual account</span></div><MoreHorizontal size={19} className="muted"/></div></div>
+        <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><strong>Need a hand?</strong><p>Quick guide to get started.</p><button onClick={() => showToast("Tip: select a class, mark attendance, then export your Excel report.")}>View guide <ArrowUpRight size={13}/></button></div></div><div className="profile"><div className="avatar teacher">SC</div><div className="profile-text"><strong>{authUser.email || "Teacher"}</strong><span>Teacher account</span></div><MoreHorizontal size={19} className="muted"/></div></div>
       </aside>
 
       <main className="main">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}><Menu/></button><div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div><div className="top-actions"><div className={`cloud-status ${cloudConfigured ? "connected" : ""}`}><span className="status-dot"/>{cloudConfigured ? "Cloud configured" : "Local demo mode"}</div><button className="icon-btn" title="Notifications" onClick={() => showToast("You're all caught up.")}><Bell size={18}/><i/></button><div className="avatar teacher small">SC</div></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}><Menu/></button><div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div><div className="top-actions"><div className={`cloud-status ${cloudConfigured ? "connected" : ""}`}><span className="status-dot"/>{cloudConfigured ? "Cloud configured" : "Local demo mode"}</div><button className="icon-btn" title="Notifications" onClick={() => showToast("You're all caught up.")}><Bell size={18}/><i/></button><button className="btn-light" onClick={async()=>{await supabase?.auth.signOut();showToast("Signed out.");}}>Sign out</button><div className="avatar teacher small">{initials(authUser.email || "T")}</div></div></header>
 
         <div className="page-content">
           <div className="page-heading"><div><div className="eyebrow">MONDAY, {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).toUpperCase()}</div><h1>{page === "Overview" ? "Good morning, Teacher 👋" : page}</h1><p>{page === "Overview" ? "Here's what's happening with your classes today." : page === "Attendance" ? "Take attendance and keep your class records up to date." : page === "Students" ? "Manage your students and class rosters." : page === "QR Session" ? "Create a secure QR check-in session for your class." : page === "Reports" ? "Review attendance trends and export your data." : "Manage your workspace preferences."}</p></div><div className="heading-actions"><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="class-select">{classes.map(c => <option key={c}>{c}</option>)}</select><button className="btn-primary" onClick={() => { setPage("Attendance"); }}><ClipboardCheck size={16}/> Take attendance</button></div></div>
@@ -192,9 +268,9 @@ export default function App() {
 
           {page === "Reports" && <><div className="stats-grid"><StatCard label="Total attendance marks" value={String(records.length)} sub="All dates and classes" icon={<ClipboardCheck/>} tone="blue"/><StatCard label="Present" value={String(records.filter(r=>r.status==="Present").length)} sub="Attendance records" icon={<CheckCircle2/>} tone="green"/><StatCard label="Absent" value={String(records.filter(r=>r.status==="Absent").length)} sub="Attendance records" icon={<XCircle/>} tone="orange"/><StatCard label="Excused" value={String(records.filter(r=>r.status==="Excused").length)} sub="Attendance records" icon={<Clock3/>} tone="purple"/></div><section className="panel full-panel"><div className="panel-head"><div><h2>Attendance report</h2><p>Export your class attendance to Excel.</p></div><button className="btn-primary" onClick={exportExcel}><Download size={16}/> Export Excel workbook</button></div><div className="report-note"><FileSpreadsheet size={28}/><div><strong>Smart Attendance Excel report</strong><p>Includes student roster, detailed attendance records, and class summary sheets.</p></div></div><div className="report-table"><table><thead><tr><th>CLASS</th><th>STUDENTS</th><th>ATTENDANCE RECORDS</th><th>PRESENT</th><th>ABSENT</th></tr></thead><tbody>{classes.map(c=>{const rs=records.filter(r=>r.className===c);return <tr key={c}><td>{c}</td><td>{students.filter(s=>s.className===c).length}</td><td>{rs.length}</td><td><span className="status present">{rs.filter(r=>r.status==="Present").length} present</span></td><td><span className="status absent">{rs.filter(r=>r.status==="Absent").length} absent</span></td></tr>})}</tbody></table></div></section></>}
 
-          {page === "Settings" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Workspace settings</h2><p>Manage your teacher workspace.</p></div></div><div className="setting-row"><div className="setting-icon"><UserRound/></div><div><strong>Teacher profile</strong><p>Teacher Demo · Individual teacher workspace</p></div><button className="btn-light" onClick={()=>showToast("Profile editing is planned for the cloud-auth phase.")}>Edit profile</button></div><div className="setting-row"><div className="setting-icon"><BookOpen/></div><div><strong>Default class</strong><p>Choose the class selected when opening the workspace.</p></div><select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}>{classes.map(c=><option key={c}>{c}</option>)}</select></div><div className="setting-row"><div className="setting-icon"><ShieldCheck/></div><div><strong>Cloud connection</strong><p>{cloudConfigured ? "Supabase project variables detected." : "Local demo data is saved in this browser. Cloud account setup is not active yet."}</p></div><span className={`status ${cloudConfigured?"present":"excused"}`}>{cloudConfigured?"Configured":"Demo mode"}</span></div><div className="setting-row"><div className="setting-icon"><Download/></div><div><strong>Export your data</strong><p>Download your attendance data as an Excel workbook.</p></div><button className="btn-primary" onClick={exportExcel}>Export Excel</button></div></section>}
+          {page === "Settings" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Workspace settings</h2><p>Manage your teacher workspace.</p></div></div><div className="setting-row"><div className="setting-icon"><UserRound/></div><div><strong>Teacher profile</strong><p>{authUser.email || "Teacher account"} · Individual teacher workspace</p></div><button className="btn-light" onClick={()=>showToast("Profile editing is planned for the cloud-auth phase.")}>Edit profile</button></div><div className="setting-row"><div className="setting-icon"><BookOpen/></div><div><strong>Default class</strong><p>Choose the class selected when opening the workspace.</p></div><select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}>{classes.map(c=><option key={c}>{c}</option>)}</select></div><div className="setting-row"><div className="setting-icon"><ShieldCheck/></div><div><strong>Cloud connection</strong><p>{cloudConfigured ? "Supabase is configured. Student and attendance data use your authenticated cloud account." : "Cloud configuration missing."}</p></div><span className={`status ${cloudConfigured?"present":"excused"}`}>{cloudConfigured?"Configured":"Demo mode"}</span></div><div className="setting-row"><div className="setting-icon"><Download/></div><div><strong>Export your data</strong><p>Download your attendance data as an Excel workbook.</p></div><button className="btn-primary" onClick={exportExcel}>Export Excel</button></div></section>}
 
-          <footer className="footer"><span>© 2026 Attendly · Smart Attendance</span><span><span className="tiny-dot green-dot"/> All changes saved locally <span className="footer-divider">·</span> <button onClick={()=>showToast("This starter is in local demo mode until Supabase CRUD/Auth is connected.")}>Help & feedback</button></span></footer>
+          <footer className="footer"><span>© 2026 Attendly · Smart Attendance</span><span><span className="tiny-dot green-dot"/> {cloudLoading ? "Syncing cloud data…" : "Cloud data active"} <span className="footer-divider">·</span> <button onClick={()=>showToast("Teacher account and cloud database are active when signed in.")}>Help & feedback</button></span></footer>
         </div>
       </main>
 
@@ -203,6 +279,31 @@ export default function App() {
       {openCheckinFromUrl && page === "QR Session" && <div className="checkin-banner">You opened a QR check-in link. Enter your roster name and roll number below. <button onClick={()=>{history.replaceState({}, "", window.location.pathname);}}>Dismiss</button></div>}
     </div>
   );
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!supabase) return;
+    setBusy(true); setMessage("");
+    try {
+      if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: displayName.trim() || "Teacher" } } });
+        if (error) throw error;
+        if (!data.session) setMessage("Account created. Check your email for the confirmation link, then return here to sign in.");
+        else setMessage("Account created successfully.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password }); if (error) throw error;
+      }
+    } catch (error: any) { setMessage(error.message || "Authentication failed."); }
+    finally { setBusy(false); }
+  };
+  return <div className="auth-screen"><form className="auth-card" onSubmit={submit}><div className="auth-mark"><GraduationCap size={25}/></div><h1>{mode === "signup" ? "Create teacher account" : "Welcome back"}</h1><p>Sign in to securely manage your classes and attendance.</p>{mode === "signup" && <label>Teacher name<input value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Your name" autoComplete="name"/></label>}<label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="teacher@example.com" required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 6 characters" required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"}/></label><button className="btn-primary auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</button>{message && <div className="auth-message">{message}</div>}<div className="auth-switch">{mode === "signup" ? "Already have an account?" : "New to Attendly?"} <button type="button" onClick={()=>{setMode(mode === "signup" ? "signin" : "signup");setMessage("");}}>{mode === "signup" ? "Sign in" : "Create account"}</button></div><small>Your data is scoped to your teacher account through database security policies.</small></form></div>;
 }
 
 function StatCard({label,value,sub,icon,tone,trend}:{label:string;value:string;sub:string;icon:React.ReactNode;tone:string;trend?:string}) {
