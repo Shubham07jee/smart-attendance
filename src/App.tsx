@@ -63,9 +63,15 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [activeSessionToken, setActiveSessionToken] = useState("");
   const [checkinName, setCheckinName] = useState("");
   const [checkinRoll, setCheckinRoll] = useState("");
-  const [sessionStudentClass, setSessionStudentClass] = useState(classes[0]);
+  const [checkinBusy, setCheckinBusy] = useState(false);
+  const [checkinMessage, setCheckinMessage] = useState("");
+  const [checkinSuccess, setCheckinSuccess] = useState(false);
+  const checkinParams = new URLSearchParams(window.location.search);
+  const checkinSessionId = checkinParams.get("checkin");
+  const checkinToken = checkinParams.get("token");
 
   useEffect(() => { if (!authUser) saveStored("sa_students", students); }, [students, authUser]);
   useEffect(() => { if (!authUser) saveStored("sa_records", records); }, [records, authUser]);
@@ -187,32 +193,101 @@ export default function App() {
     XLSX.writeFile(wb, `Smart-Attendance-${date}.xlsx`);
     showToast("Excel report downloaded.");
   };
-  const createSession = () => {
-    const s: Session = { id: crypto.randomUUID(), className: selectedClass, createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), active: true };
-    setSessions(prev => [s, ...prev.map(x => ({ ...x, active: false }))]);
-    setActiveSession(s);
-    showToast("QR session created (expires in 15 minutes).");
-  };
-  const sessionUrl = activeSession ? `${window.location.origin}${window.location.pathname}?checkin=${activeSession.id}` : "";
-  const openCheckinFromUrl = new URLSearchParams(window.location.search).get("checkin");
-  useEffect(() => {
-    if (openCheckinFromUrl) {
-      const s = getStored<Session[]>("sa_sessions", []).find(x => x.id === openCheckinFromUrl);
-      if (s) { setActiveSession(s); setSessionStudentClass(s.className); setPage("QR Session"); }
+  const createSession = async () => {
+    if (!supabase || !authUser) {
+      showToast("Please sign in to create a QR session.");
+      return;
     }
-  }, [openCheckinFromUrl]);
-  const submitCheckin = () => {
-    if (!activeSession) return;
-    if (!activeSession.active || Date.now() > new Date(activeSession.expiresAt).getTime()) { showToast("This QR session has expired."); return; }
-    const st = students.find(s => s.className === activeSession.className && s.roll.trim().toLowerCase() === checkinRoll.trim().toLowerCase() && s.name.trim().toLowerCase() === checkinName.trim().toLowerCase());
-    if (!st) { showToast("Student name and roll number do not match the class roster."); return; }
-    setRecords(prev => {
-      if (prev.some(r => r.studentId === st.id && r.date === today && r.className === activeSession.className)) return prev;
-      return [...prev, { studentId: st.id, date: today, status: "Present", className: activeSession.className }];
-    });
-    showToast(`Attendance submitted for ${st.name}.`);
-    setCheckinName(""); setCheckinRoll("");
+
+    const classId = classIds[selectedClass];
+    if (!classId) {
+      showCloudError("Class is not ready yet. Please retry.");
+      return;
+    }
+
+    try {
+      // Keep the raw token only in memory and in the QR URL. Store only its hash.
+      const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+      const token = Array.from(randomBytes, byte => byte.toString(16).padStart(2, "0")).join("");
+      const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+      const tokenHash = Array.from(new Uint8Array(hashBuffer), byte => byte.toString(16).padStart(2, "0")).join("");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from("attendance_sessions")
+        .insert({
+          teacher_id: authUser.id,
+          class_id: classId,
+          session_date: today,
+          token_hash: tokenHash,
+          expires_at: expiresAt,
+          active: true
+        })
+        .select("id, expires_at")
+        .single();
+
+      if (error) throw error;
+
+      const session: Session = {
+        id: data.id,
+        className: selectedClass,
+        createdAt: new Date().toISOString(),
+        expiresAt: data.expires_at,
+        active: true
+      };
+
+      setSessions(prev => [session, ...prev.map(item => ({ ...item, active: false }))]);
+      setActiveSession(session);
+      setActiveSessionToken(token);
+      showToast("Secure QR session created. It expires in 15 minutes.");
+    } catch (error: any) {
+      showCloudError(error.message || "Unable to create QR session.");
+    }
   };
+
+  const appBaseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+  const sessionUrl = activeSession && activeSessionToken
+    ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
+    : "";
+
+  const submitCheckin = async () => {
+    if (!supabase || !checkinSessionId || !checkinToken) {
+      setCheckinSuccess(false);
+      setCheckinMessage("This QR link is incomplete or invalid. Scan the latest QR code again.");
+      return;
+    }
+    if (!checkinName.trim() || !checkinRoll.trim()) {
+      setCheckinSuccess(false);
+      setCheckinMessage("Enter both your full name and roll number.");
+      return;
+    }
+
+    setCheckinBusy(true);
+    setCheckinMessage("");
+    try {
+      const { data, error } = await supabase.rpc("submit_qr_attendance", {
+        p_session_id: checkinSessionId,
+        p_token: checkinToken,
+        p_full_name: checkinName.trim(),
+        p_roll_number: checkinRoll.trim()
+      });
+      if (error) throw error;
+
+      const result = data as { success?: boolean; message?: string; student_name?: string } | null;
+      setCheckinSuccess(Boolean(result?.success));
+      setCheckinMessage(result?.message || "Unexpected response from attendance server.");
+      if (result?.success) {
+        setCheckinName("");
+        setCheckinRoll("");
+      }
+    } catch (error: any) {
+      setCheckinSuccess(false);
+      setCheckinMessage(error.message || "Unable to submit attendance. Please try again.");
+    } finally {
+      setCheckinBusy(false);
+    }
+  };
+
   const navItems = [
     { name: "Overview", icon: LayoutDashboard }, { name: "Students", icon: Users },
     { name: "Attendance", icon: ClipboardCheck }, { name: "QR Session", icon: QrCode },
@@ -225,6 +300,32 @@ export default function App() {
     const rs = records.filter(r => r.date === iso && r.className === selectedClass && r.status === "Present");
     return { label: d.toLocaleDateString("en", { weekday: "short" }), count: rs.length };
   }), [records, selectedClass]);
+
+  if (checkinSessionId) {
+    if (!supabase) {
+      return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Attendance check-in is unavailable because Supabase is not configured.</p></div></div>;
+    }
+    return (
+      <div className="auth-screen">
+        <form className="auth-card" onSubmit={event => { event.preventDefault(); void submitCheckin(); }}>
+          <div className="auth-mark"><GraduationCap size={25}/></div>
+          <h1>Student check-in</h1>
+          <p>Enter your name and roll number exactly as registered with your teacher.</p>
+          <label>Full name
+            <input value={checkinName} onChange={event => setCheckinName(event.target.value)} placeholder="Enter your full name" autoComplete="name" required />
+          </label>
+          <label>Roll number
+            <input value={checkinRoll} onChange={event => setCheckinRoll(event.target.value)} placeholder="e.g. CE-001" required />
+          </label>
+          <button className="btn-primary auth-submit" type="submit" disabled={checkinBusy || checkinSuccess}>
+            {checkinBusy ? "Submitting…" : checkinSuccess ? "Attendance submitted" : "Submit attendance"}
+          </button>
+          {checkinMessage && <div className="auth-message">{checkinMessage}</div>}
+          <small>This check-in link expires after 15 minutes. No teacher account is needed.</small>
+        </form>
+      </div>
+    );
+  }
 
   if (authLoading) return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Checking your teacher account…</p></div></div>;
   if (!supabase) return <div className="auth-screen"><div className="auth-card"><h1>Supabase setup required</h1><p>Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.local file, then restart Vite.</p></div></div>;
@@ -264,7 +365,7 @@ export default function App() {
 
           {page === "Students" && <section className="panel full-panel"><div className="panel-head"><div><h2>Class roster</h2><p>{selectedCount} students · {selectedClass}</p></div><div className="inline-tools"><SearchBox value={search} onChange={setSearch}/><button className="btn-primary" onClick={() => setShowAdd(true)}><Plus size={16}/> Add student</button></div></div><div className="student-list"><table><thead><tr><th>STUDENT</th><th>ROLL NUMBER</th><th>CLASS</th><th>EMAIL</th><th></th></tr></thead><tbody>{filteredStudents.map(s=><tr key={s.id}><td><div className="student-cell"><div className="avatar">{initials(s.name)}</div><strong>{s.name}</strong></div></td><td><span className="roll-tag">{s.roll}</span></td><td>{s.className}</td><td>{s.email || "—"}</td><td><button className="icon-btn row-action" onClick={()=>removeStudent(s.id)} title="Remove student"><Trash2 size={15}/></button></td></tr>)}</tbody></table>{filteredStudents.length===0 && <EmptyState title="No students found" text="Try a different search or add a student."/>}</div></section>}
 
-          {page === "QR Session" && <div className="qr-layout"><section className="panel qr-panel"><div className="panel-head"><div><h2>QR attendance session</h2><p>Students scan this code to submit their attendance.</p></div><span className="badge-neutral"><span className="tiny-dot green-dot"/> Session tool</span></div>{activeSession ? <div className="qr-active"><div className="qr-box"><QRCodeSVG value={sessionUrl} size={210} level="H" includeMargin/><span className="qr-logo"><GraduationCap size={17}/></span></div><h3>{activeSession.className}</h3><p>Scan to check in · Expires {new Date(activeSession.expiresAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</p><div className="session-token"><span>Session ID</span><code>{activeSession.id.slice(0, 12)}…</code><button onClick={()=>{navigator.clipboard?.writeText(sessionUrl);showToast("Session link copied.");}}><Copy size={14}/></button></div><div className="qr-buttons"><button className="btn-light" onClick={()=>{setActiveSession(null);showToast("Session panel closed.");}}>Close panel</button><button className="btn-primary" onClick={createSession}><RefreshCw size={15}/> New QR session</button></div><div className="qr-warning"><ShieldCheck size={17}/><span>Demo QR session: identity is checked against this browser's roster. Use server-side validation before production.</span></div></div> : <div className="qr-empty"><div className="qr-empty-icon"><QrCode size={32}/></div><h3>Ready to take attendance?</h3><p>Create a QR session and display it on your classroom screen. Students can scan the code and check in.</p><button className="btn-primary" onClick={createSession}><QrCode size={16}/> Generate QR code</button></div>}</section><section className="panel qr-instructions"><div className="panel-head"><div><h2>How it works</h2><p>Three simple steps</p></div></div><div className="step-list"><Step n="01" title="Generate a QR code" text="Start a new attendance session for your selected class."/><Step n="02" title="Students scan" text="Students scan the QR code and enter their name and roll number."/><Step n="03" title="Review attendance" text="Check the class roster and correct any attendance status." /></div><div className="security-note"><ShieldCheck size={18}/><div><strong>Session safety</strong><p>QR sessions are intended to expire after 15 minutes. For real deployment, expiration and validation must be enforced by the database/server.</p></div></div></section>{activeSession && <section className="panel student-checkin"><div className="panel-head"><div><h2>Student check-in preview</h2><p>Test the check-in flow on this device.</p></div></div><div className="checkin-form"><label>Full name<input value={checkinName} onChange={e=>setCheckinName(e.target.value)} placeholder="Enter name exactly as roster"/></label><label>Roll number<input value={checkinRoll} onChange={e=>setCheckinRoll(e.target.value)} placeholder="e.g. CE-001"/></label><button className="btn-primary" onClick={submitCheckin}>Submit attendance</button></div></section>}</div>}
+          {page === "QR Session" && <div className="qr-layout"><section className="panel qr-panel"><div className="panel-head"><div><h2>QR attendance session</h2><p>Students scan this code to submit their attendance.</p></div><span className="badge-neutral"><span className="tiny-dot green-dot"/> Session tool</span></div>{activeSession ? <div className="qr-active"><div className="qr-box"><QRCodeSVG value={sessionUrl} size={210} level="H" includeMargin/><span className="qr-logo"><GraduationCap size={17}/></span></div><h3>{activeSession.className}</h3><p>Scan to check in · Expires {new Date(activeSession.expiresAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</p><div className="session-token"><span>Session ID</span><code>{activeSession.id.slice(0, 12)}…</code><button onClick={()=>{navigator.clipboard?.writeText(sessionUrl);showToast("Session link copied.");}}><Copy size={14}/></button></div><div className="qr-buttons"><button className="btn-light" onClick={()=>{setActiveSession(null);showToast("Session panel closed.");}}>Close panel</button><button className="btn-primary" onClick={createSession}><RefreshCw size={15}/> New QR session</button></div><div className="qr-warning"><ShieldCheck size={17}/><span>Secure QR session: the database validates the session token, expiry, and student roster.</span></div></div> : <div className="qr-empty"><div className="qr-empty-icon"><QrCode size={32}/></div><h3>Ready to take attendance?</h3><p>Create a QR session and display it on your classroom screen. Students can scan the code and check in.</p><button className="btn-primary" onClick={createSession}><QrCode size={16}/> Generate QR code</button></div>}</section><section className="panel qr-instructions"><div className="panel-head"><div><h2>How it works</h2><p>Three simple steps</p></div></div><div className="step-list"><Step n="01" title="Generate a QR code" text="Start a new attendance session for your selected class."/><Step n="02" title="Students scan" text="Students scan the QR code and enter their name and roll number."/><Step n="03" title="Review attendance" text="Check the class roster and correct any attendance status." /></div><div className="security-note"><ShieldCheck size={18}/><div><strong>Session safety</strong><p>QR sessions are intended to expire after 15 minutes. For real deployment, expiration and validation must be enforced by the database/server.</p></div></div></section></div>}
 
           {page === "Reports" && <><div className="stats-grid"><StatCard label="Total attendance marks" value={String(records.length)} sub="All dates and classes" icon={<ClipboardCheck/>} tone="blue"/><StatCard label="Present" value={String(records.filter(r=>r.status==="Present").length)} sub="Attendance records" icon={<CheckCircle2/>} tone="green"/><StatCard label="Absent" value={String(records.filter(r=>r.status==="Absent").length)} sub="Attendance records" icon={<XCircle/>} tone="orange"/><StatCard label="Excused" value={String(records.filter(r=>r.status==="Excused").length)} sub="Attendance records" icon={<Clock3/>} tone="purple"/></div><section className="panel full-panel"><div className="panel-head"><div><h2>Attendance report</h2><p>Export your class attendance to Excel.</p></div><button className="btn-primary" onClick={exportExcel}><Download size={16}/> Export Excel workbook</button></div><div className="report-note"><FileSpreadsheet size={28}/><div><strong>Smart Attendance Excel report</strong><p>Includes student roster, detailed attendance records, and class summary sheets.</p></div></div><div className="report-table"><table><thead><tr><th>CLASS</th><th>STUDENTS</th><th>ATTENDANCE RECORDS</th><th>PRESENT</th><th>ABSENT</th></tr></thead><tbody>{classes.map(c=>{const rs=records.filter(r=>r.className===c);return <tr key={c}><td>{c}</td><td>{students.filter(s=>s.className===c).length}</td><td>{rs.length}</td><td><span className="status present">{rs.filter(r=>r.status==="Present").length} present</span></td><td><span className="status absent">{rs.filter(r=>r.status==="Absent").length} absent</span></td></tr>})}</tbody></table></div></section></>}
 
@@ -276,7 +377,6 @@ export default function App() {
 
       {showAdd && <div className="modal-backdrop" onClick={()=>setShowAdd(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>Add a student</h2><p>Add a student to {selectedClass}.</p></div><button className="icon-btn" onClick={()=>setShowAdd(false)}><X/></button></div><label>Student name<input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Alex Morgan"/></label><label>Roll number<input value={newRoll} onChange={e=>setNewRoll(e.target.value)} placeholder="e.g. CE-011"/></label><div className="modal-actions"><button className="btn-light" onClick={()=>setShowAdd(false)}>Cancel</button><button className="btn-primary" onClick={addStudent}><Plus size={15}/> Add student</button></div></div></div>}
       {toast && <div className="toast"><CheckCircle2 size={17}/>{toast}</div>}
-      {openCheckinFromUrl && page === "QR Session" && <div className="checkin-banner">You opened a QR check-in link. Enter your roster name and roll number below. <button onClick={()=>{history.replaceState({}, "", window.location.pathname);}}>Dismiss</button></div>}
     </div>
   );
 }
