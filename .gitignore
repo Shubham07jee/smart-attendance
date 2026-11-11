@@ -4,3 +4,6 @@ dist/
 .env.local
 .DS_Store
 *.log
+# Android local configuration
+android/local.properties
+android/.idea/
