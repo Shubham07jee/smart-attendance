@@ -49,7 +49,7 @@ jobs:
       - name: Build React application
         run: npm run build
         env:
-          GITHUB_ACTIONS: "false"
+          VITE_BASE_PATH: "/"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
