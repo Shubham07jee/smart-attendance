@@ -4,7 +4,7 @@ import {
   Search, Bell, Plus, Download, ChevronDown, CalendarDays, CheckCircle2,
   Clock3, XCircle, MoreHorizontal, ArrowUpRight, Sparkles, Menu, Trash2,
   Copy, RefreshCw, ExternalLink, ShieldCheck, GraduationCap, X, Check,
-  UserRound, BookOpen, CircleHelp
+  UserRound, BookOpen, CircleHelp, Eye, EyeOff
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import * as XLSX from "xlsx";
@@ -49,6 +49,7 @@ export default function App() {
   const [page, setPage] = useState("Overview");
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [classIds, setClassIds] = useState<Record<string, string>>({});
   const [cloudLoading, setCloudLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>(() => getStored("sa_students", []));
@@ -80,7 +81,11 @@ export default function App() {
   useEffect(() => {
     if (!supabase) { setAuthLoading(false); return; }
     supabase.auth.getSession().then(({ data }) => { setAuthUser(data.session?.user ?? null); setAuthLoading(false); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setAuthUser(session?.user ?? null));
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      setAuthUser(session?.user ?? null);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
+      if (event === "SIGNED_OUT") setPasswordRecovery(false);
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
 
@@ -329,6 +334,7 @@ export default function App() {
 
   if (authLoading) return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Checking your teacher account…</p></div></div>;
   if (!supabase) return <div className="auth-screen"><div className="auth-card"><h1>Supabase setup required</h1><p>Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.local file, then restart Vite.</p></div></div>;
+  if (passwordRecovery) return <AuthScreen initialMode="reset" onPasswordUpdated={() => setPasswordRecovery(false)} />;
   if (!authUser) return <AuthScreen />;
 
   return (
@@ -381,29 +387,148 @@ export default function App() {
   );
 }
 
-function AuthScreen() {
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+function AuthScreen({ initialMode = "signin", onPasswordUpdated }: { initialMode?: "signin" | "signup" | "reset"; onPasswordUpdated?: () => void }) {
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!supabase) return;
-    setBusy(true); setMessage("");
-    try {
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: displayName.trim() || "Teacher" } } });
-        if (error) throw error;
-        if (!data.session) setMessage("Account created. Check your email for the confirmation link, then return here to sign in.");
-        else setMessage("Account created successfully.");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password }); if (error) throw error;
-      }
-    } catch (error: any) { setMessage(error.message || "Authentication failed."); }
-    finally { setBusy(false); }
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+
+  const setNotice = (text: string, type: "success" | "error" = "success") => {
+    setMessage(text);
+    setMessageType(type);
   };
-  return <div className="auth-screen"><form className="auth-card" onSubmit={submit}><div className="auth-mark"><GraduationCap size={25}/></div><h1>{mode === "signup" ? "Create teacher account" : "Welcome back"}</h1><p>Sign in to securely manage your classes and attendance.</p>{mode === "signup" && <label>Teacher name<input value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Your name" autoComplete="name"/></label>}<label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="teacher@example.com" required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 6 characters" required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"}/></label><button className="btn-primary auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</button>{message && <div className="auth-message">{message}</div>}<div className="auth-switch">{mode === "signup" ? "Already have an account?" : "New to Attendly?"} <button type="button" onClick={()=>{setMode(mode === "signup" ? "signin" : "signup");setMessage("");}}>{mode === "signup" ? "Sign in" : "Create account"}</button></div><small>Your data is scoped to your teacher account through database security policies.</small></form></div>;
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        setNotice("If an account exists for this email, a password reset link has been sent. Check your inbox and spam folder.");
+      } else if (mode === "reset") {
+        if (password.length < 6) throw new Error("Your new password must be at least 6 characters.");
+        if (password !== confirmPassword) throw new Error("The passwords do not match.");
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        await supabase.auth.signOut();
+        setPassword("");
+        setConfirmPassword("");
+        setMode("signin");
+        onPasswordUpdated?.();
+        setNotice("Your password has been updated. Sign in with your new password.");
+      } else if (mode === "signup") {
+        if (password !== confirmPassword) throw new Error("The passwords do not match.");
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { display_name: displayName.trim() || "Teacher" } },
+        });
+        if (error) throw error;
+        if (!data.session) {
+          setNotice("Account created. Check your email for the confirmation link, then return here to sign in.");
+        } else {
+          setNotice("Account created successfully.");
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      setNotice(error.message || "Authentication failed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const title = mode === "signup" ? "Create teacher account"
+    : mode === "forgot" ? "Reset your password"
+    : mode === "reset" ? "Choose a new password"
+    : "Welcome back";
+  const description = mode === "signup"
+    ? "Create your secure teacher account to manage classes and attendance."
+    : mode === "forgot"
+    ? "Enter the email address linked to your account. We'll send you a password reset link."
+    : mode === "reset"
+    ? "Choose a new password for your teacher account."
+    : "Sign in to securely manage your classes and attendance.";
+
+  return (
+    <div className="auth-screen">
+      <form className="auth-card" onSubmit={submit}>
+        <div className="auth-mark"><GraduationCap size={25}/></div>
+        <h1>{title}</h1>
+        <p>{description}</p>
+
+        {mode === "signup" && (
+          <label>Teacher name
+            <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" autoComplete="name"/>
+          </label>
+        )}
+
+        {(mode === "signin" || mode === "signup" || mode === "forgot") && (
+          <label>Email address
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="teacher@example.com" required autoComplete="email"/>
+          </label>
+        )}
+
+        {(mode === "signin" || mode === "signup" || mode === "reset") && (
+          <label>{mode === "reset" ? "New password" : "Password"}
+            <span className="auth-password-wrap">
+              <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === "signin" ? "Enter your password" : "At least 6 characters"} required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"}/>
+              <button className="password-toggle" type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"} title={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+              </button>
+            </span>
+          </label>
+        )}
+
+        {(mode === "signup" || mode === "reset") && (
+          <label>Confirm password
+            <span className="auth-password-wrap">
+              <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required minLength={6} autoComplete="new-password"/>
+              <button className="password-toggle" type="button" onClick={() => setShowConfirmPassword(v => !v)} aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"} title={showConfirmPassword ? "Hide password" : "Show password"}>
+                {showConfirmPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+              </button>
+            </span>
+          </label>
+        )}
+
+        {mode === "signin" && (
+          <div className="auth-forgot-row">
+            <button type="button" onClick={() => { setMode("forgot"); setMessage(""); setPassword(""); }}>Forgot password?</button>
+          </div>
+        )}
+
+        <button className="btn-primary auth-submit" type="submit" disabled={busy}>
+          {busy ? "Please wait…" : mode === "signup" ? "Create account" : mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : "Update password"}
+        </button>
+
+        {message && <div className={`auth-message ${messageType === "error" ? "error" : "success"}`} role="status">{message}</div>}
+
+        <div className="auth-switch">
+          {mode === "reset" ? (
+            <button type="button" onClick={() => { setMode("signin"); setMessage(""); onPasswordUpdated?.(); }}>Back to sign in</button>
+          ) : mode === "forgot" ? (
+            <>Remembered your password? <button type="button" onClick={() => { setMode("signin"); setMessage(""); }}>Back to sign in</button></>
+          ) : (
+            <>{mode === "signup" ? "Already have an account?" : "New to Attendly?"} <button type="button" onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setMessage(""); setPassword(""); setConfirmPassword(""); }}>{mode === "signup" ? "Sign in" : "Create account"}</button></>
+          )}
+        </div>
+        <small>Your data is scoped to your teacher account through database security policies.</small>
+      </form>
+    </div>
+  );
 }
 
 function StatCard({label,value,sub,icon,tone,trend}:{label:string;value:string;sub:string;icon:React.ReactNode;tone:string;trend?:string}) {

@@ -18,3 +18,14 @@
 .auth-message{background:#f3f5ff;border:1px solid #dfe3ff;color:#4247a2;border-radius:10px;padding:11px 12px;font-size:13px;line-height:1.5}
 .auth-switch{text-align:center;font-size:13px;color:#69738a}.auth-switch button{border:0;background:none;color:#5659d8;font-weight:700;cursor:pointer;margin-left:4px}
 .auth-card small{font-size:11px;color:#8790a4;text-align:center;line-height:1.5}
+
+/* Authentication form enhancements */
+.auth-password-wrap{position:relative;display:block;width:100%}
+.auth-password-wrap input{padding-right:46px}
+.auth-password-wrap .password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:#778198;cursor:pointer}
+.auth-password-wrap .password-toggle:hover{background:#f0f2f8;color:#4f55c7}
+.auth-password-wrap .password-toggle:focus-visible,.auth-forgot-row button:focus-visible{outline:2px solid #6c6ee8;outline-offset:2px}
+.auth-forgot-row{display:flex;justify-content:flex-end;margin-top:-8px}
+.auth-forgot-row button{border:0;background:none;padding:2px 0;color:#5659d8;font-size:12px;font-weight:700;cursor:pointer}
+.auth-message.error{background:#fff2f1;border-color:#ffd8d4;color:#a83228}
+.auth-message.success{background:#f3f5ff;border-color:#dfe3ff;color:#4247a2}
