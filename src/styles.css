@@ -46,3 +46,39 @@
   object-fit: cover;
   border-radius: inherit;
 }
+
+/* Smart Attendance branding refinements */
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  overflow: hidden;
+  background: transparent;
+  border-radius: 12px;
+}
+
+.brand-mark svg {
+  display: block;
+  width: 42px;
+  height: 42px;
+}
+
+.auth-mark {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  overflow: hidden;
+  background: transparent;
+  border-radius: 15px;
+  color: #0b1b3a;
+}
+
+.auth-mark svg {
+  display: block;
+  width: 58px;
+  height: 58px;
+}

@@ -45,6 +45,40 @@ const initials = (name: string) => name.split(" ").map(p => p[0]).slice(0, 2).jo
 const statusClass = (s: Status) => s.toLowerCase();
 const classes = ["Computer Engineering", "Mathematics", "Physics"];
 
+function BrandLogo({ size = 42 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Smart Attendance logo"
+    >
+      <rect width="64" height="64" rx="15" fill="#0B1B3A" />
+
+      {/* Graduation cap */}
+      <path d="M7 21L32 9L57 21L32 33L7 21Z" fill="white" />
+      <path
+        d="M15 27V42C24 49 40 49 49 42V27L32 35L15 27Z"
+        fill="white"
+      />
+      <path d="M54 22V34" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* Attendance check */}
+      <circle cx="46" cy="46" r="13" fill="#0D75F5" />
+      <path
+        d="M40 46L44 50L52 41"
+        stroke="white"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState("Overview");
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -277,7 +311,7 @@ const appBaseUrl =
 const sessionUrl = activeSession && activeSessionToken
   ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
   : "";
-  
+
   const submitCheckin = async () => {
     if (!supabase || !checkinSessionId || !checkinToken) {
       setCheckinSuccess(false);
@@ -331,12 +365,12 @@ const sessionUrl = activeSession && activeSessionToken
 
   if (checkinSessionId) {
     if (!supabase) {
-      return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Attendance check-in is unavailable because Supabase is not configured.</p></div></div>;
+      return <div className="auth-screen"><div className="auth-card"><h1>Smart Attendance</h1><p>Attendance check-in is unavailable because Supabase is not configured.</p></div></div>;
     }
     return (
       <div className="auth-screen">
         <form className="auth-card" onSubmit={event => { event.preventDefault(); void submitCheckin(); }}>
-          <div className="auth-mark"><GraduationCap size={25}/></div>
+          <div className="auth-mark"><BrandLogo size={58} /></div>
           <h1>Student check-in</h1>
           <p>Enter your name and roll number exactly as registered with your teacher.</p>
           <label>Full name
@@ -355,7 +389,7 @@ const sessionUrl = activeSession && activeSessionToken
     );
   }
 
-  if (authLoading) return <div className="auth-screen"><div className="auth-card"><h1>Attendly</h1><p>Checking your teacher account…</p></div></div>;
+  if (authLoading) return <div className="auth-screen"><div className="auth-card"><h1>Smart Attendance</h1><p>Checking your teacher account…</p></div></div>;
   if (!supabase) return <div className="auth-screen"><div className="auth-card"><h1>Supabase setup required</h1><p>Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.local file, then restart Vite.</p></div></div>;
   if (passwordRecovery) return <AuthScreen initialMode="reset" onPasswordUpdated={() => setPasswordRecovery(false)} />;
   if (!authUser) return <AuthScreen />;
@@ -363,7 +397,15 @@ const sessionUrl = activeSession && activeSessionToken
   return (
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
-        <div className="brand"><div className="brand-mark"><GraduationCap size={22}/></div><div><strong>Attendly</strong><span>Teacher workspace</span></div></div>
+        <div className="brand">
+  <div className="brand-mark">
+    <BrandLogo size={42} />
+  </div>
+  <div className="brand-text">
+    <strong>Smart Attendance</strong>
+    <span>Track · Manage · Grow</span>
+  </div>
+</div>
         <div className="workspace-label">WORKSPACE</div>
         <nav>{navItems.map(item => { const Icon = item.icon; return <button key={item.name} className={`nav-item ${page === item.name ? "active" : ""}`} onClick={() => { setPage(item.name); setSidebarOpen(false); }}><Icon size={18}/><span>{item.name}</span>{item.name === "Attendance" && <span className="nav-count">{marked}</span>}</button>; })}</nav>
         <div className="sidebar-bottom">
@@ -399,7 +441,7 @@ const sessionUrl = activeSession && activeSessionToken
 
           {page === "Reports" && <><div className="stats-grid"><StatCard label="Total attendance marks" value={String(records.length)} sub="All dates and classes" icon={<ClipboardCheck/>} tone="blue"/><StatCard label="Present" value={String(records.filter(r=>r.status==="Present").length)} sub="Attendance records" icon={<CheckCircle2/>} tone="green"/><StatCard label="Absent" value={String(records.filter(r=>r.status==="Absent").length)} sub="Attendance records" icon={<XCircle/>} tone="orange"/><StatCard label="Excused" value={String(records.filter(r=>r.status==="Excused").length)} sub="Attendance records" icon={<Clock3/>} tone="purple"/></div><section className="panel full-panel"><div className="panel-head"><div><h2>Attendance report</h2><p>Export your class attendance to Excel.</p></div><button className="btn-primary" onClick={exportExcel}><Download size={16}/> Export Excel workbook</button></div><div className="report-note"><FileSpreadsheet size={28}/><div><strong>Smart Attendance Excel report</strong><p>Includes student roster, detailed attendance records, and class summary sheets.</p></div></div><div className="report-table"><table><thead><tr><th>CLASS</th><th>STUDENTS</th><th>ATTENDANCE RECORDS</th><th>PRESENT</th><th>ABSENT</th></tr></thead><tbody>{classes.map(c=>{const rs=records.filter(r=>r.className===c);return <tr key={c}><td>{c}</td><td>{students.filter(s=>s.className===c).length}</td><td>{rs.length}</td><td><span className="status present">{rs.filter(r=>r.status==="Present").length} present</span></td><td><span className="status absent">{rs.filter(r=>r.status==="Absent").length} absent</span></td></tr>})}</tbody></table></div></section></>}
 
-          {page === "Help" && <section className="panel full-panel"><div className="panel-head"><div><h2>Attendly quick guide</h2><p>Essential steps for managing your classroom.</p></div></div><div className="step-list"><Step n="01" title="Set up your class" text="Choose your class from the selector and add students with their registered names and roll numbers."/><Step n="02" title="Take attendance" text="Open Attendance, choose the date, and mark each student Present, Absent, Late, or Excused."/><Step n="03" title="Use QR check-in" text="Open QR Session and generate a time-limited code. Students scan it and enter their roster details."/><Step n="04" title="Review and export" text="Use Reports to review attendance and download the Excel workbook."/><Step n="05" title="Manage your account" text="Use your profile menu to update teacher details and sign out securely."/></div><div className="security-note"><ShieldCheck size={18}/><div><strong>Need more help?</strong><p>For account or attendance issues, contact your project administrator. Never share your password or reset link.</p></div></div></section>}
+          {page === "Help" && <section className="panel full-panel"><div className="panel-head"><div><h2>Smart Attendance quick guide</h2><p>Essential steps for managing your classroom.</p></div></div><div className="step-list"><Step n="01" title="Set up your class" text="Choose your class from the selector and add students with their registered names and roll numbers."/><Step n="02" title="Take attendance" text="Open Attendance, choose the date, and mark each student Present, Absent, Late, or Excused."/><Step n="03" title="Use QR check-in" text="Open QR Session and generate a time-limited code. Students scan it and enter their roster details."/><Step n="04" title="Review and export" text="Use Reports to review attendance and download the Excel workbook."/><Step n="05" title="Manage your account" text="Use your profile menu to update teacher details and sign out securely."/></div><div className="security-note"><ShieldCheck size={18}/><div><strong>Need more help?</strong><p>For account or attendance issues, contact your project administrator. Never share your password or reset link.</p></div></div></section>}
           {page === "Settings" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Workspace settings</h2><p>Manage your teacher workspace.</p></div></div><div className="setting-row"><div className="setting-icon"><UserRound/></div><div><strong>Teacher profile</strong><p>{authUser.email || "Teacher account"} · Individual teacher workspace</p></div><button className="btn-light" onClick={()=>setPage("My Profile")}>Edit profile</button></div><div className="setting-row"><div className="setting-icon"><BookOpen/></div><div><strong>Default class</strong><p>Choose the class selected when opening the workspace.</p></div><select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}>{classes.map(c=><option key={c}>{c}</option>)}</select></div><div className="setting-row"><div className="setting-icon"><ShieldCheck/></div><div><strong>Cloud connection</strong><p>{cloudConfigured ? "Supabase is configured. Student and attendance data use your authenticated cloud account." : "Cloud configuration missing."}</p></div><span className={`status ${cloudConfigured?"present":"excused"}`}>{cloudConfigured?"Configured":"Demo mode"}</span></div><div className="setting-row"><div className="setting-icon"><Download/></div><div><strong>Export your data</strong><p>Download your attendance data as an Excel workbook.</p></div><button className="btn-primary" onClick={exportExcel}>Export Excel</button></div></section>}
 
           {page === "My Profile" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Teacher profile</h2><p>Manage the details shown in your workspace.</p></div></div><form className="profile-form" onSubmit={async e => { e.preventDefault(); if (!supabase || !authUser) return; setProfileBusy(true); try { let avatar_url = profile.avatar_url; if (profilePhoto) { const path = `${authUser.id}/${Date.now()}-${profilePhoto.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`; const upload = await supabase.storage.from("teacher-avatars").upload(path, profilePhoto, { upsert: true, contentType: profilePhoto.type }); if (upload.error) throw upload.error; avatar_url = supabase.storage.from("teacher-avatars").getPublicUrl(path).data.publicUrl; } const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -426,7 +468,7 @@ const saved = await supabase
   .upsert(payload, { onConflict: "id" });
 
 if (saved.error) throw saved.error; setProfile(p => ({...p, avatar_url})); setProfilePhoto(null); showToast("Teacher profile saved."); } catch (err: any) { showCloudError(err.message || "Could not save profile."); } finally { setProfileBusy(false); } }}><div className="profile-photo-row"><div className="avatar teacher profile-large">{profile.avatar_url ? <img src={profile.avatar_url} alt="Teacher"/> : initials(profile.display_name || authUser.email || "T")}</div><label>Upload profile photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setProfilePhoto(e.target.files?.[0] || null)}/><small>PNG, JPG or WebP · maximum 2 MB</small></label></div><div className="profile-fields"><label>Teacher name<input value={profile.display_name} onChange={e=>setProfile(p=>({...p,display_name:e.target.value}))} required/></label><label>Teacher ID<input value={profile.teacher_id} onChange={e=>setProfile(p=>({...p,teacher_id:e.target.value}))} placeholder="Enter teacher ID"/></label><label>Department / Class<input value={profile.department} onChange={e=>setProfile(p=>({...p,department:e.target.value}))} placeholder={selectedClass}/></label><label>Qualifications<input value={profile.qualification} onChange={e=>setProfile(p=>({...p,qualification:e.target.value}))} placeholder="e.g. M.E., B.Ed."/></label><label>Phone number<input value={profile.phone} onChange={e=>setProfile(p=>({...p,phone:e.target.value}))} placeholder="Optional"/></label><label>Email address<input value={authUser.email || ""} readOnly/></label></div><div className="modal-actions"><button type="button" className="btn-light" onClick={()=>setPage("Settings")}>Cancel</button><button className="btn-primary" disabled={profileBusy}>{profileBusy ? "Saving…" : "Save profile"}</button></div></form></section>}
-          <footer className="footer"><span>© 2026 Attendly · Smart Attendance</span><span><span className="tiny-dot green-dot"/> {cloudLoading ? "Syncing cloud data…" : "Cloud data active"} <span className="footer-divider">·</span> <button onClick={()=>showToast("Teacher account and cloud database are active when signed in.")}>Help & feedback</button></span></footer>
+          <footer className="footer"><span>© 2026 Smart Attendance</span><span><span className="tiny-dot green-dot"/> {cloudLoading ? "Syncing cloud data…" : "Cloud data active"} <span className="footer-divider">·</span> <button onClick={()=>showToast("Teacher account and cloud database are active when signed in.")}>Help & feedback</button></span></footer>
         </div>
       </main>
 
@@ -517,7 +559,7 @@ function AuthScreen({ initialMode = "signin", onPasswordUpdated }: { initialMode
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={submit}>
-        <div className="auth-mark"><GraduationCap size={25}/></div>
+        <div className="auth-mark"><BrandLogo size={58} /></div>
         <h1>{title}</h1>
         <p>{description}</p>
 
@@ -573,7 +615,7 @@ function AuthScreen({ initialMode = "signin", onPasswordUpdated }: { initialMode
           ) : mode === "forgot" ? (
             <>Remembered your password? <button type="button" onClick={() => { setMode("signin"); setMessage(""); }}>Back to sign in</button></>
           ) : (
-            <>{mode === "signup" ? "Already have an account?" : "New to Attendly?"} <button type="button" onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setMessage(""); setPassword(""); setConfirmPassword(""); }}>{mode === "signup" ? "Sign in" : "Create account"}</button></>
+            <>{mode === "signup" ? "Already have an account?" : "New to Smart Attendance?"} <button type="button" onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setMessage(""); setPassword(""); setConfirmPassword(""); }}>{mode === "signup" ? "Sign in" : "Create account"}</button></>
           )}
         </div>
         <small>Your data is scoped to your teacher account through database security policies.</small>
