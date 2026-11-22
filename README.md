@@ -1,136 +1,329 @@
-# Smart Attendance — Teacher Edition
 
-A professional, minimal attendance management starter for individual teachers.
+<div align="center">
 
-## Included in this ZIP
+<img src="app-icon.png" alt="Smart Attendance Logo" width="130" />
 
-- Responsive teacher dashboard
-- Demo/local mode (works without Supabase)
-- Add/remove students and search roster
-- Manual attendance: Present, Absent, Late, Excused
-- QR session generator (QR points to a session link)
-- QR session page where a student can submit name + roll number
-- Excel workbook export (`.xlsx`)
-- Supabase-ready schema and Row Level Security policies
-- Git-friendly project layout
+# SMART ATTENDANCE
 
-> **Important:** Local/demo mode saves data in this browser only. It is not shared between devices. To enable cloud persistence and real teacher accounts, follow the Supabase setup below. QR attendance in this starter is a functional prototype; before real-world use, configure Supabase-backed session validation and student identity verification. A QR code by itself does not prove a student's physical presence.
+### ✦ Attendance made smarter. Management made simpler. ✦
 
-## Requirements
+A digital attendance management platform designed to simplify classroom attendance, student management, and teacher workflows.
 
-Install:
-- Node.js LTS (20 or newer recommended)
-- npm (comes with Node.js)
-- Git (optional, for Git commits)
+[🌐 Live Website](https://smart-attendance-shubh.vercel.app/) · [📦 Releases](https://github.com/Shubham07jee/smart-attendance/releases) · [🐛 Report an Issue](https://github.com/Shubham07jee/smart-attendance/issues)
 
-## Start on Ubuntu (beginner steps)
+![React](https://img.shields.io/badge/React-TypeScript-blue?logo=react)
+![Vite](https://img.shields.io/badge/Built%20with-Vite-646CFF?logo=vite)
+![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E?logo=supabase)
+![Capacitor](https://img.shields.io/badge/Android-Capacitor-119EFF?logo=capacitor)
+![Status](https://img.shields.io/badge/Status-Active-success)
 
-1. Download and extract the ZIP.
-2. Open the extracted `SmartAttendancePro` folder.
-3. Right-click inside the folder and choose **Open in Terminal**.
-4. Check Node/npm:
-   ```bash
-   node -v
-   npm -v
-   ```
-5. If those commands show version numbers, install dependencies:
-   ```bash
-   npm install
-   ```
-6. Start the app:
-   ```bash
-   npm run dev
-   ```
-7. Open the URL shown in terminal, usually `http://localhost:5173`.
-8. Stop the app with **Ctrl + C** in that terminal.
+</div>
 
-## Supabase cloud setup
+---
 
-1. Create a project at https://supabase.com/
-2. In Supabase, open **SQL Editor**.
-3. Copy/paste `supabase/migrations/001_initial_schema.sql` and click **Run**.
-4. In Supabase, open **Project Settings → API** (or API Keys).
-5. Copy the **Project URL** and the **anon/public key**. Never copy the `service_role` / secret key into a frontend.
-6. In this project folder, duplicate `.env.example` and name the copy `.env`.
-7. Put the URL and anon/public key into `.env`.
-8. Restart Vite (`Ctrl+C`, then `npm run dev`).
+## ⚡ About the Project
 
-The starter uses Supabase client initialization when environment values exist. The SQL defines teacher-owned records and policies. Check/test the policies in Supabase before storing real student data.
+**Smart Attendance** is a digital attendance management system that brings essential classroom operations into one centralized platform.
 
-## Excel
+It helps teachers manage students, record attendance, generate QR-based check-in sessions, and maintain their profiles through a responsive web application and Android application.
 
-Click **Export Excel** in the app. The workbook includes a roster sheet and attendance sheet. Export is generated in your browser.
+The goal is to make attendance management simpler, more organized, and accessible.
 
-## QR flow
+---
 
-1. Choose **QR Session** from the sidebar.
-2. Create a session for the selected class.
-3. Show the QR to students.
-4. Students open the QR URL and enter their name/roll number.
-5. Teacher can review/mark attendance in the dashboard.
+## ✨ Key Features
 
-The demo QR URL is based on the current app origin and uses a local session ID. The QR check-in is a prototype in local mode; production use needs authenticated/server-side session expiry, anti-replay protections, and verified student identity.
+| Feature | Description |
+|:---|:---|
+| 🔐 **Teacher Authentication** | Teacher registration, sign-in, and password recovery |
+| 📊 **Dashboard** | Centralized attendance and classroom overview |
+| 👨‍🎓 **Student Management** | Add, search, and manage student records |
+| ✅ **Attendance Tracking** | Record Present, Absent, Late, and Excused statuses |
+| 📱 **QR Attendance** | Generate QR codes for student check-in |
+| 📑 **Excel Export** | Export attendance information into Excel |
+| 👤 **Profile Management** | Update teacher details and profile picture |
+| ☁️ **Cloud Integration** | Supabase authentication, database, and storage |
+| 📲 **Android Support** | Android application powered by Capacitor |
 
-## Git: make many commits (save points)
+---
 
-A commit is like a named save point. Commit often, after a small working milestone.
+## 🖥️ Application Preview
 
-### First save
+Explore the application:
 
-```bash
-git init
-git add .
-git commit -m "Initial Smart Attendance project"
+[**Open Smart Attendance Live →**](https://smart-attendance-shubh.vercel.app/)
+
+### 📊 Teacher Dashboard
+
+<div align="center">
+<img src="dashboard.png" alt="Smart Attendance Dashboard" width="95%" />
+</div>
+
+### ✅ Attendance Management
+
+<div align="center">
+<img src="attendance.png" alt="Smart Attendance Management" width="95%" />
+</div>
+
+---
+
+## 🛠️ Technology Stack
+
+| Category | Technology |
+|:---|:---|
+| Frontend | React, TypeScript |
+| Build Tool | Vite |
+| Styling | CSS |
+| Backend | Supabase |
+| Authentication | Supabase Auth |
+| Database | Supabase PostgreSQL |
+| File Storage | Supabase Storage |
+| Android Integration | Capacitor |
+| Icons | Lucide React |
+
+---
+
+## 🏗️ System Architecture
+
+<div align="center">
+
+| Layer | Responsibility |
+|:---|:---|
+| 👨‍🏫 **Teacher** | Uses the attendance management platform |
+| 🖥️ **Frontend** | React + TypeScript interface |
+| ⚙️ **Application Services** | Handles application operations |
+| ☁️ **Supabase** | Authentication, database, and storage |
+| 📱 **Android** | Mobile application through Capacitor |
+
+</div>
+
+### Application Flow
+
+<div align="center">
+
+**TEACHER**
+
+⬇️
+
+**SMART ATTENDANCE**
+
+⬇️
+
+**REACT + TYPESCRIPT**
+
+⬇️
+
+**SUPABASE BACKEND**
+
+⬇️
+
+**AUTHENTICATION · DATABASE · STORAGE**
+
+</div>
+
+---
+
+## 📂 Project Structure
+
+```text
+smart-attendance/
+│
+├── android/                  # Native Android project
+│
+├── legacy/                   # Legacy project files
+│
+├── src/                      # React application source
+│
+├── supabase/
+│   └── migrations/           # Database SQL migrations
+│
+├── screenshots/              # Screenshot documentation folder
+│
+├── app-icon.png              # Application logo
+├── dashboard.png             # Dashboard screenshot
+├── attendance.png            # Attendance screenshot
+│
+├── .env.example              # Environment template
+├── .gitignore
+├── capacitor.config.ts       # Capacitor configuration
+├── index.html
+├── package.json
+├── package-lock.json
+├── vite.config.ts
+└── README.md
 ```
 
-### Save more progress
+---
+
+## 🚀 Getting Started
+
+Follow these instructions to run Smart Attendance locally.
+
+### Prerequisites
+
+- Node.js (20 or newer recommended)
+- npm
+- Git
+- A Supabase project
+
+### 1. Clone the Repository
 
 ```bash
-git status
-git add .
-git commit -m "Add student management"
+git clone https://github.com/Shubham07jee/smart-attendance.git
 ```
 
-Use clear messages, for example:
-- `Add attendance dashboard`
-- `Add QR session screen`
-- `Add Excel export`
-- `Fix attendance status update`
-- `Improve mobile layout`
-
-### Connect to your GitHub repository
-
-If you already have a repository, copy its SSH URL from GitHub (it looks like `git@github.com:USERNAME/REPOSITORY.git`), then:
+### 2. Navigate to the Project
 
 ```bash
-git branch -M main
-git remote add origin git@github.com:USERNAME/REPOSITORY.git
-git push -u origin main
+cd smart-attendance
 ```
 
-If `origin` already exists, don't run `remote add` again. Check it with:
+### 3. Install Dependencies
+
 ```bash
-git remote -v
+npm install
 ```
 
-Then future saves:
+### 4. Configure Environment Variables
+
+Create a file named `.env.local` in the root directory.
+
+Add your Supabase credentials:
+
+```env
+VITE_SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+```
+
+Replace the placeholders with your actual Supabase project URL and publishable key.
+
+**Important:** Never expose your Supabase secret key or service-role key in frontend code. Never upload `.env.local` to GitHub.
+
+### 5. Configure Supabase
+
+1. Create a Supabase project.
+2. Open the SQL Editor.
+3. Apply the migrations in the correct order:
+   - `001_initial_schema.sql`
+   - `002_qr_profile_features.sql`
+4. Configure the required authentication settings.
+5. Verify database and storage security policies.
+
+### 6. Start the Development Server
+
 ```bash
-git add .
-git commit -m "Describe what changed"
-git push
+npm run dev
 ```
 
-### Keep your original GitHub project safe
+Open the local URL shown in your terminal.
 
-This ZIP does **not** overwrite your GitHub repo. First extract and test it locally. If you want to replace the existing repository later, make a backup or create a new branch first.
+Usually:
 
-## Production checklist before real use
+```text
+http://localhost:5173
+```
 
-- Set up Supabase Auth (teacher sign-in)
-- Wire database CRUD in the app (current UI demo data is browser-local)
-- Test RLS with two different teacher accounts
-- Configure QR session expiry and server-side token validation
-- Confirm identity verification rules
-- Add backups and privacy/retention policy
-- Test Excel report accuracy
-- Test on Android before building APK
+### 7. Create a Production Build
+
+```bash
+npm run build
+```
+
+The production-ready frontend files are generated in the `dist/` directory.
+
+---
+
+## 📱 Android Application
+
+Smart Attendance also supports Android through Capacitor.
+
+### Requirements
+
+- Android Studio
+- Android SDK
+- Compatible Java Development Kit
+
+### Build and Synchronize
+
+Run these commands from the project root:
+
+**Build the web application:**
+
+```bash
+npm run build
+```
+
+**Synchronize Android assets:**
+
+```bash
+npx cap sync android
+```
+
+**Open Android Studio:**
+
+```bash
+npx cap open android
+```
+
+You can then build and run the Android application using Android Studio.
+
+---
+
+## 🔒 Security
+
+- Teacher authentication is managed through Supabase Auth.
+- Database access uses Row Level Security policies.
+- Private credentials must never be committed to the repository.
+- QR-based check-in should be combined with suitable identity verification and server-side validation for real-world deployments.
+
+---
+
+## 📦 Releases
+
+Android builds and version history will be available through GitHub Releases.
+
+[**Explore Smart Attendance Releases →**](https://github.com/Shubham07jee/smart-attendance/releases)
+
+---
+
+## 🗺️ Future Improvements
+
+- Enhanced attendance analytics and reporting
+- Improved student verification
+- More attendance history and filtering options
+- Additional Android improvements
+- Expanded notification and classroom management features
+
+---
+
+## 🤝 Contributing
+
+Contributions, suggestions, and bug reports are welcome.
+
+1. Fork the repository.
+2. Create a new feature branch.
+3. Make your changes.
+4. Test your changes.
+5. Submit a pull request.
+
+[**Report an Issue →**](https://github.com/Shubham07jee/smart-attendance/issues)
+
+---
+
+## 👨‍💻 Developer
+
+<div align="center">
+
+### Shubham Chaudhari
+
+**Developer of Smart Attendance**
+
+[GitHub Profile](https://github.com/Shubham07jee) · [Project Repository](https://github.com/Shubham07jee/smart-attendance) · [Live Website](https://smart-attendance-shubh.vercel.app/)
+
+---
+
+### ✦ Making attendance management simpler. ✦
+
+**If you find this project useful, consider giving it a ⭐**
+
+</div>
