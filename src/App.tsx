@@ -70,6 +70,11 @@ export default function App() {
   const [checkinBusy, setCheckinBusy] = useState(false);
   const [checkinMessage, setCheckinMessage] = useState("");
   const [checkinSuccess, setCheckinSuccess] = useState(false);
+  const [profileMenu, setProfileMenu] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [profile, setProfile] = useState({ display_name: "", teacher_id: "", qualification: "", department: "", phone: "", avatar_url: "" });
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const checkinParams = new URLSearchParams(window.location.search);
   const checkinSessionId = checkinParams.get("checkin");
   const checkinToken = checkinParams.get("token");
@@ -88,6 +93,17 @@ export default function App() {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!supabase || !authUser) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("teacher_profiles").select("display_name,teacher_id,qualification,department,phone,avatar_url").eq("id", authUser.id).maybeSingle();
+      if (!cancelled && data) setProfile({ display_name: data.display_name || String(authUser.user_metadata?.display_name || "Teacher"), teacher_id: data.teacher_id || "", qualification: data.qualification || "", department: data.department || "", phone: data.phone || "", avatar_url: data.avatar_url || "" });
+      else if (!cancelled) setProfile(p => ({ ...p, display_name: String(authUser.user_metadata?.display_name || authUser.email?.split("@")[0] || "Teacher") }));
+    })();
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   useEffect(() => {
     if (!supabase || !authUser) {
@@ -250,11 +266,18 @@ export default function App() {
     }
   };
 
-  const appBaseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-  const sessionUrl = activeSession && activeSessionToken
-    ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
-    : "";
+// Use the laptop's Wi-Fi IP for local QR testing.
+// Use the actual website domain when deployed.
+const appBaseUrl =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://192.168.1.7:5173"
+    : window.location.origin;
 
+const sessionUrl = activeSession && activeSessionToken
+  ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
+  : "";
+  
   const submitCheckin = async () => {
     if (!supabase || !checkinSessionId || !checkinToken) {
       setCheckinSuccess(false);
@@ -343,11 +366,12 @@ export default function App() {
         <div className="brand"><div className="brand-mark"><GraduationCap size={22}/></div><div><strong>Attendly</strong><span>Teacher workspace</span></div></div>
         <div className="workspace-label">WORKSPACE</div>
         <nav>{navItems.map(item => { const Icon = item.icon; return <button key={item.name} className={`nav-item ${page === item.name ? "active" : ""}`} onClick={() => { setPage(item.name); setSidebarOpen(false); }}><Icon size={18}/><span>{item.name}</span>{item.name === "Attendance" && <span className="nav-count">{marked}</span>}</button>; })}</nav>
-        <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><strong>Need a hand?</strong><p>Quick guide to get started.</p><button onClick={() => showToast("Tip: select a class, mark attendance, then export your Excel report.")}>View guide <ArrowUpRight size={13}/></button></div></div><div className="profile"><div className="avatar teacher">SC</div><div className="profile-text"><strong>{authUser.email || "Teacher"}</strong><span>Teacher account</span></div><MoreHorizontal size={19} className="muted"/></div></div>
+        <div className="sidebar-bottom">
+          <div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><strong>Need a hand?</strong><p>Quick guide to get started.</p><button onClick={() => setPage("Help")}>View guide <ArrowUpRight size={13}/></button></div></div><button className="profile profile-trigger" onClick={() => setProfileMenu(v => !v)}><div className="avatar teacher sidebar-profile-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt="Teacher profile" /> : initials(profile.display_name || authUser.email || "T")}</div><div className="profile-text"><strong>{profile.display_name || authUser.email || "Teacher"}</strong><span>Teacher account · {selectedClass}</span></div><MoreHorizontal size={19} className="muted"/></button></div>
       </aside>
 
       <main className="main">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}><Menu/></button><div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div><div className="top-actions"><div className={`cloud-status ${cloudConfigured ? "connected" : ""}`}><span className="status-dot"/>{cloudConfigured ? "Cloud configured" : "Local demo mode"}</div><button className="icon-btn" title="Notifications" onClick={() => showToast("You're all caught up.")}><Bell size={18}/><i/></button><button className="btn-light" onClick={async()=>{await supabase?.auth.signOut();showToast("Signed out.");}}>Sign out</button><div className="avatar teacher small">{initials(authUser.email || "T")}</div></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}><Menu/></button><div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div><div className="top-actions"><div className={`cloud-status ${cloudConfigured ? "connected" : ""}`}><span className="status-dot"/>{cloudConfigured ? "Cloud configured" : "Local demo mode"}</div><button className="icon-btn" title="Notifications" onClick={() => { setNotificationOpen(v => !v); setProfileMenu(false); }}><Bell size={18}/><i/></button><button className="btn-light" onClick={async()=>{await supabase?.auth.signOut();}}>Sign out</button><button className="avatar teacher small avatar-trigger" title="My profile" onClick={() => { setProfileMenu(v => !v); setNotificationOpen(false); }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="Teacher profile"/> : initials(profile.display_name || authUser.email || "T")}</button></div></header>
 
         <div className="page-content">
           <div className="page-heading"><div><div className="eyebrow">MONDAY, {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).toUpperCase()}</div><h1>{page === "Overview" ? "Good morning, Teacher 👋" : page}</h1><p>{page === "Overview" ? "Here's what's happening with your classes today." : page === "Attendance" ? "Take attendance and keep your class records up to date." : page === "Students" ? "Manage your students and class rosters." : page === "QR Session" ? "Create a secure QR check-in session for your class." : page === "Reports" ? "Review attendance trends and export your data." : "Manage your workspace preferences."}</p></div><div className="heading-actions"><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="class-select">{classes.map(c => <option key={c}>{c}</option>)}</select><button className="btn-primary" onClick={() => { setPage("Attendance"); }}><ClipboardCheck size={16}/> Take attendance</button></div></div>
@@ -375,12 +399,39 @@ export default function App() {
 
           {page === "Reports" && <><div className="stats-grid"><StatCard label="Total attendance marks" value={String(records.length)} sub="All dates and classes" icon={<ClipboardCheck/>} tone="blue"/><StatCard label="Present" value={String(records.filter(r=>r.status==="Present").length)} sub="Attendance records" icon={<CheckCircle2/>} tone="green"/><StatCard label="Absent" value={String(records.filter(r=>r.status==="Absent").length)} sub="Attendance records" icon={<XCircle/>} tone="orange"/><StatCard label="Excused" value={String(records.filter(r=>r.status==="Excused").length)} sub="Attendance records" icon={<Clock3/>} tone="purple"/></div><section className="panel full-panel"><div className="panel-head"><div><h2>Attendance report</h2><p>Export your class attendance to Excel.</p></div><button className="btn-primary" onClick={exportExcel}><Download size={16}/> Export Excel workbook</button></div><div className="report-note"><FileSpreadsheet size={28}/><div><strong>Smart Attendance Excel report</strong><p>Includes student roster, detailed attendance records, and class summary sheets.</p></div></div><div className="report-table"><table><thead><tr><th>CLASS</th><th>STUDENTS</th><th>ATTENDANCE RECORDS</th><th>PRESENT</th><th>ABSENT</th></tr></thead><tbody>{classes.map(c=>{const rs=records.filter(r=>r.className===c);return <tr key={c}><td>{c}</td><td>{students.filter(s=>s.className===c).length}</td><td>{rs.length}</td><td><span className="status present">{rs.filter(r=>r.status==="Present").length} present</span></td><td><span className="status absent">{rs.filter(r=>r.status==="Absent").length} absent</span></td></tr>})}</tbody></table></div></section></>}
 
-          {page === "Settings" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Workspace settings</h2><p>Manage your teacher workspace.</p></div></div><div className="setting-row"><div className="setting-icon"><UserRound/></div><div><strong>Teacher profile</strong><p>{authUser.email || "Teacher account"} · Individual teacher workspace</p></div><button className="btn-light" onClick={()=>showToast("Profile editing is planned for the cloud-auth phase.")}>Edit profile</button></div><div className="setting-row"><div className="setting-icon"><BookOpen/></div><div><strong>Default class</strong><p>Choose the class selected when opening the workspace.</p></div><select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}>{classes.map(c=><option key={c}>{c}</option>)}</select></div><div className="setting-row"><div className="setting-icon"><ShieldCheck/></div><div><strong>Cloud connection</strong><p>{cloudConfigured ? "Supabase is configured. Student and attendance data use your authenticated cloud account." : "Cloud configuration missing."}</p></div><span className={`status ${cloudConfigured?"present":"excused"}`}>{cloudConfigured?"Configured":"Demo mode"}</span></div><div className="setting-row"><div className="setting-icon"><Download/></div><div><strong>Export your data</strong><p>Download your attendance data as an Excel workbook.</p></div><button className="btn-primary" onClick={exportExcel}>Export Excel</button></div></section>}
+          {page === "Help" && <section className="panel full-panel"><div className="panel-head"><div><h2>Attendly quick guide</h2><p>Essential steps for managing your classroom.</p></div></div><div className="step-list"><Step n="01" title="Set up your class" text="Choose your class from the selector and add students with their registered names and roll numbers."/><Step n="02" title="Take attendance" text="Open Attendance, choose the date, and mark each student Present, Absent, Late, or Excused."/><Step n="03" title="Use QR check-in" text="Open QR Session and generate a time-limited code. Students scan it and enter their roster details."/><Step n="04" title="Review and export" text="Use Reports to review attendance and download the Excel workbook."/><Step n="05" title="Manage your account" text="Use your profile menu to update teacher details and sign out securely."/></div><div className="security-note"><ShieldCheck size={18}/><div><strong>Need more help?</strong><p>For account or attendance issues, contact your project administrator. Never share your password or reset link.</p></div></div></section>}
+          {page === "Settings" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Workspace settings</h2><p>Manage your teacher workspace.</p></div></div><div className="setting-row"><div className="setting-icon"><UserRound/></div><div><strong>Teacher profile</strong><p>{authUser.email || "Teacher account"} · Individual teacher workspace</p></div><button className="btn-light" onClick={()=>setPage("My Profile")}>Edit profile</button></div><div className="setting-row"><div className="setting-icon"><BookOpen/></div><div><strong>Default class</strong><p>Choose the class selected when opening the workspace.</p></div><select value={selectedClass} onChange={e=>setSelectedClass(e.target.value)}>{classes.map(c=><option key={c}>{c}</option>)}</select></div><div className="setting-row"><div className="setting-icon"><ShieldCheck/></div><div><strong>Cloud connection</strong><p>{cloudConfigured ? "Supabase is configured. Student and attendance data use your authenticated cloud account." : "Cloud configuration missing."}</p></div><span className={`status ${cloudConfigured?"present":"excused"}`}>{cloudConfigured?"Configured":"Demo mode"}</span></div><div className="setting-row"><div className="setting-icon"><Download/></div><div><strong>Export your data</strong><p>Download your attendance data as an Excel workbook.</p></div><button className="btn-primary" onClick={exportExcel}>Export Excel</button></div></section>}
 
+          {page === "My Profile" && <section className="panel full-panel settings-panel"><div className="panel-head"><div><h2>Teacher profile</h2><p>Manage the details shown in your workspace.</p></div></div><form className="profile-form" onSubmit={async e => { e.preventDefault(); if (!supabase || !authUser) return; setProfileBusy(true); try { let avatar_url = profile.avatar_url; if (profilePhoto) { const path = `${authUser.id}/${Date.now()}-${profilePhoto.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`; const upload = await supabase.storage.from("teacher-avatars").upload(path, profilePhoto, { upsert: true, contentType: profilePhoto.type }); if (upload.error) throw upload.error; avatar_url = supabase.storage.from("teacher-avatars").getPublicUrl(path).data.publicUrl; } const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+if (userError) throw userError;
+
+if (!user) {
+  throw new Error("Your login session is not available. Please log in again.");
+}
+
+if (user.id !== authUser.id) {
+  throw new Error("Your login session does not match the profile. Please log in again.");
+}
+
+const payload = {
+  ...profile,
+  id: user.id,
+  avatar_url,
+  updated_at: new Date().toISOString()
+};
+
+const saved = await supabase
+  .from("teacher_profiles")
+  .upsert(payload, { onConflict: "id" });
+
+if (saved.error) throw saved.error; setProfile(p => ({...p, avatar_url})); setProfilePhoto(null); showToast("Teacher profile saved."); } catch (err: any) { showCloudError(err.message || "Could not save profile."); } finally { setProfileBusy(false); } }}><div className="profile-photo-row"><div className="avatar teacher profile-large">{profile.avatar_url ? <img src={profile.avatar_url} alt="Teacher"/> : initials(profile.display_name || authUser.email || "T")}</div><label>Upload profile photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setProfilePhoto(e.target.files?.[0] || null)}/><small>PNG, JPG or WebP · maximum 2 MB</small></label></div><div className="profile-fields"><label>Teacher name<input value={profile.display_name} onChange={e=>setProfile(p=>({...p,display_name:e.target.value}))} required/></label><label>Teacher ID<input value={profile.teacher_id} onChange={e=>setProfile(p=>({...p,teacher_id:e.target.value}))} placeholder="Enter teacher ID"/></label><label>Department / Class<input value={profile.department} onChange={e=>setProfile(p=>({...p,department:e.target.value}))} placeholder={selectedClass}/></label><label>Qualifications<input value={profile.qualification} onChange={e=>setProfile(p=>({...p,qualification:e.target.value}))} placeholder="e.g. M.E., B.Ed."/></label><label>Phone number<input value={profile.phone} onChange={e=>setProfile(p=>({...p,phone:e.target.value}))} placeholder="Optional"/></label><label>Email address<input value={authUser.email || ""} readOnly/></label></div><div className="modal-actions"><button type="button" className="btn-light" onClick={()=>setPage("Settings")}>Cancel</button><button className="btn-primary" disabled={profileBusy}>{profileBusy ? "Saving…" : "Save profile"}</button></div></form></section>}
           <footer className="footer"><span>© 2026 Attendly · Smart Attendance</span><span><span className="tiny-dot green-dot"/> {cloudLoading ? "Syncing cloud data…" : "Cloud data active"} <span className="footer-divider">·</span> <button onClick={()=>showToast("Teacher account and cloud database are active when signed in.")}>Help & feedback</button></span></footer>
         </div>
       </main>
 
+      {profileMenu && <><button className="menu-dismiss" aria-label="Close profile menu" onClick={()=>setProfileMenu(false)}/><div className="account-menu"><div className="account-menu-head"><strong>{profile.display_name || "Teacher"}</strong><span>{authUser.email}</span><small>{profile.teacher_id ? `Teacher ID: ${profile.teacher_id}` : "Teacher account"} · {selectedClass}</small></div><button onClick={()=>{setPage("My Profile");setProfileMenu(false);}}> <UserRound size={15}/> My profile</button><button onClick={()=>{setPage("Settings");setProfileMenu(false);}}><Settings size={15}/> Settings</button><button onClick={async()=>{setProfileMenu(false);await supabase?.auth.signOut();}}><ExternalLink size={15}/> Sign out</button></div></>}
+      {notificationOpen && <><button className="menu-dismiss" aria-label="Close notifications" onClick={()=>setNotificationOpen(false)}/><div className="notification-menu"><strong>Notifications</strong><p>No new notifications right now.</p><small>Attendance updates and account alerts will appear here.</small></div></>}
       {showAdd && <div className="modal-backdrop" onClick={()=>setShowAdd(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>Add a student</h2><p>Add a student to {selectedClass}.</p></div><button className="icon-btn" onClick={()=>setShowAdd(false)}><X/></button></div><label>Student name<input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Alex Morgan"/></label><label>Roll number<input value={newRoll} onChange={e=>setNewRoll(e.target.value)} placeholder="e.g. CE-011"/></label><div className="modal-actions"><button className="btn-light" onClick={()=>setShowAdd(false)}>Cancel</button><button className="btn-primary" onClick={addStudent}><Plus size={15}/> Add student</button></div></div></div>}
       {toast && <div className="toast"><CheckCircle2 size={17}/>{toast}</div>}
     </div>
