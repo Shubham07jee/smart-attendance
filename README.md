@@ -56,13 +56,31 @@ Explore the application:
 ### 📊 Teacher Dashboard
 
 <div align="center">
-<img src="dashboard.png" alt="Smart Attendance Dashboard" width="95%" />
+<img src="screenshots/dashboard.png" alt="Smart Attendance Dashboard" width="95%" />
 </div>
 
 ### ✅ Attendance Management
 
 <div align="center">
-<img src="attendance.png" alt="Smart Attendance Management" width="95%" />
+<img src="screenshots/attendance.png" alt="Smart Attendance Attendance Management" width="95%" />
+</div>
+
+### 📱 QR-Based Attendance
+
+<div align="center">
+<img src="screenshots/qr-attendance.png" alt="Smart Attendance QR Attendance" width="95%" />
+</div>
+
+### 👤 Teacher Profile
+
+<div align="center">
+<img src="screenshots/profile.png" alt="Smart Attendance Teacher Profile" width="95%" />
+</div>
+
+### 🔐 Teacher Registration
+
+<div align="center">
+<img src="screenshots/signup.png" alt="Smart Attendance Teacher Registration" width="95%" />
 </div>
 
 ---
@@ -137,11 +155,15 @@ smart-attendance/
 ├── supabase/
 │   └── migrations/           # Database SQL migrations
 │
-├── screenshots/              # Screenshot documentation folder
+├── screenshots/
+│   ├── README.md
+│   ├── dashboard.png
+│   ├── attendance.png
+│   ├── profile.png
+│   ├── signup.png
+│   └── qr-attendance.png
 │
 ├── app-icon.png              # Application logo
-├── dashboard.png             # Dashboard screenshot
-├── attendance.png            # Attendance screenshot
 │
 ├── .env.example              # Environment template
 ├── .gitignore
@@ -229,7 +251,7 @@ http://localhost:5173
 npm run build
 ```
 
-The production-ready frontend files are generated in the `dist/` directory.
+The production frontend files are generated in the `dist/` directory.
 
 ---
 
@@ -245,7 +267,7 @@ Smart Attendance also supports Android through Capacitor.
 
 ### Build and Synchronize
 
-Run these commands from the project root:
+Run these commands from the project root.
 
 **Build the web application:**
 
@@ -272,7 +294,7 @@ You can then build and run the Android application using Android Studio.
 ## 🔒 Security
 
 - Teacher authentication is managed through Supabase Auth.
-- Database access uses Row Level Security policies.
+- Database access uses Row Level Security (RLS) policies.
 - Private credentials must never be committed to the repository.
 - QR-based check-in should be combined with suitable identity verification and server-side validation for real-world deployments.
 
