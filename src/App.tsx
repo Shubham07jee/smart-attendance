@@ -1,3 +1,8 @@
+
+import * as XLSX from "xlsx";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, ClipboardCheck, QrCode, FileSpreadsheet, Settings,
@@ -7,7 +12,6 @@ import {
   UserRound, BookOpen, CircleHelp, Eye, EyeOff
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import * as XLSX from "xlsx";
 import { cloudConfigured, supabase } from "./supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -193,6 +197,7 @@ export default function App() {
   const filteredStudents = classStudents.filter(s => `${s.name} ${s.roll}`.toLowerCase().includes(search.toLowerCase()));
 
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
+
   const mark = async (studentId: string, status: Status) => {
     const entry = { studentId, date, status, className: selectedClass };
     if (authUser && supabase) {
@@ -203,6 +208,7 @@ export default function App() {
     }
     setRecords(prev => { const existing = prev.findIndex(r => r.studentId === studentId && r.date === date && r.className === selectedClass); if (existing >= 0) { const next = [...prev]; next[existing] = entry; return next; } return [...prev, entry]; });
   };
+
   const markAllPresent = async () => {
     const entries = classStudents.map(s => ({ studentId: s.id, date, status: "Present" as Status, className: selectedClass }));
     if (authUser && supabase) {
@@ -212,6 +218,7 @@ export default function App() {
     }
     setRecords(prev => [...prev.filter(r => !(r.date === date && r.className === selectedClass)), ...entries]); showToast("Everyone marked present.");
   };
+
   const addStudent = async () => {
     if (!newName.trim() || !newRoll.trim()) { showToast("Please enter both name and roll number."); return; }
     if (students.some(s => s.roll.toLowerCase() === newRoll.trim().toLowerCase() && s.className === selectedClass)) { showToast("This roll number already exists in the class."); return; }
@@ -225,29 +232,84 @@ export default function App() {
     }
     setStudents(prev => [...prev, student]); setNewName(""); setNewRoll(""); setShowAdd(false); showToast("Student added.");
   };
+
   const removeStudent = async (id: string) => {
     const student = students.find(s => s.id === id);
     if (!student || !confirm(`Remove ${student.name} from this roster?`)) return;
     if (authUser && supabase) { const result = await supabase.from("students").delete().eq("id", id).eq("teacher_id", authUser.id); if (result.error) { showCloudError(result.error.message); return; } }
     setStudents(prev => prev.filter(s => s.id !== id)); setRecords(prev => prev.filter(r => r.studentId !== id)); showToast("Student removed.");
   };
-  const exportExcel = () => {
-    const roster = students.map(s => ({ "Student name": s.name, "Roll number": s.roll, Class: s.className }));
-    const detail = records.map(r => {
-      const s = students.find(st => st.id === r.studentId);
-      return { Date: r.date, Class: r.className, "Student name": s?.name ?? "Removed student", "Roll number": s?.roll ?? "", Status: r.status };
-    });
-    const summary = classes.map(c => {
-      const rs = records.filter(r => r.className === c);
-      return { Class: c, "Total students": students.filter(s => s.className === c).length, "Present records": rs.filter(r => r.status === "Present").length, "Absent records": rs.filter(r => r.status === "Absent").length, "Late records": rs.filter(r => r.status === "Late").length, "Excused records": rs.filter(r => r.status === "Excused").length };
-    });
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(roster), "Students");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), "Attendance");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Summary");
-    XLSX.writeFile(wb, `Smart-Attendance-${date}.xlsx`);
-    showToast("Excel report downloaded.");
+
+  // Android: save the workbook to the app cache and open the native Share sheet.
+  // Web: retain the normal browser download.
+  const exportExcel = async () => {
+    try {
+      const roster = students.map(s => ({
+        "Student name": s.name,
+        "Roll number": s.roll,
+        Class: s.className,
+      }));
+
+      const detail = records.map(r => {
+        const s = students.find(st => st.id === r.studentId);
+        return {
+          Date: r.date,
+          Class: r.className,
+          "Student name": s?.name ?? "Removed student",
+          "Roll number": s?.roll ?? "",
+          Status: r.status,
+        };
+      });
+
+      const summary = classes.map(c => {
+        const rs = records.filter(r => r.className === c);
+        return {
+          Class: c,
+          "Total students": students.filter(s => s.className === c).length,
+          "Present records": rs.filter(r => r.status === "Present").length,
+          "Absent records": rs.filter(r => r.status === "Absent").length,
+          "Late records": rs.filter(r => r.status === "Late").length,
+          "Excused records": rs.filter(r => r.status === "Excused").length,
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(roster), "Students");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), "Attendance");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Summary");
+
+      const filename = `Smart-Attendance-${date}.xlsx`;
+
+      if (Capacitor.isNativePlatform()) {
+        const base64 = XLSX.write(wb, {
+          bookType: "xlsx",
+          type: "base64",
+        });
+
+        const file = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: "Smart Attendance Excel Report",
+          text: "Your attendance report is ready.",
+          url: file.uri,
+          dialogTitle: "Share attendance report",
+        });
+
+        showToast("Excel report is ready to share.");
+      } else {
+        XLSX.writeFile(wb, filename);
+        showToast("Excel report downloaded.");
+      }
+    } catch (error: any) {
+      console.error("Excel export failed:", error);
+      showToast(error?.message || "Unable to export Excel report.");
+    }
   };
+
   const createSession = async () => {
     if (!supabase || !authUser) {
       showToast("Please sign in to create a QR session.");
@@ -300,17 +362,17 @@ export default function App() {
     }
   };
 
-// Use the laptop's Wi-Fi IP for local QR testing.
-// Use the actual website domain when deployed.
-const appBaseUrl =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? "http://192.168.1.7:5173"
-    : window.location.origin;
+  // Use the laptop's Wi-Fi IP for local QR testing.
+  // Use the actual website domain when deployed.
+  const appBaseUrl =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://192.168.1.7:5173"
+      : window.location.origin;
 
-const sessionUrl = activeSession && activeSessionToken
-  ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
-  : "";
+  const sessionUrl = activeSession && activeSessionToken
+    ? `${appBaseUrl}${window.location.pathname}?checkin=${encodeURIComponent(activeSession.id)}&token=${encodeURIComponent(activeSessionToken)}`
+    : "";
 
   const submitCheckin = async () => {
     if (!supabase || !checkinSessionId || !checkinToken) {
@@ -398,14 +460,14 @@ const sessionUrl = activeSession && activeSessionToken
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand">
-  <div className="brand-mark">
-    <BrandLogo size={42} />
-  </div>
-  <div className="brand-text">
-    <strong>Smart Attendance</strong>
-    <span>Track · Manage · Grow</span>
-  </div>
-</div>
+          <div className="brand-mark">
+            <BrandLogo size={42} />
+          </div>
+          <div className="brand-text">
+            <strong>Smart Attendance</strong>
+            <span>Track · Manage · Grow</span>
+          </div>
+        </div>
         <div className="workspace-label">WORKSPACE</div>
         <nav>{navItems.map(item => { const Icon = item.icon; return <button key={item.name} className={`nav-item ${page === item.name ? "active" : ""}`} onClick={() => { setPage(item.name); setSidebarOpen(false); }}><Icon size={18}/><span>{item.name}</span>{item.name === "Attendance" && <span className="nav-count">{marked}</span>}</button>; })}</nav>
         <div className="sidebar-bottom">

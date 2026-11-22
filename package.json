@@ -11,6 +11,8 @@
   "dependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
     "@supabase/supabase-js": "^2.57.0",
     "lucide-react": "^0.468.0",
     "qrcode.react": "^4.2.0",
