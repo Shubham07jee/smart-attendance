@@ -1,20 +1,21 @@
 
 <div align="center">
 
-<img src="app-icon.png" alt="Smart Attendance Logo" width="130" />
+<img src="app-icon.png" alt="Smart Attendance Logo" width="140" />
 
 # SMART ATTENDANCE
 
-### ✦ Attendance made smarter. Management made simpler. ✦
+### Attendance made smarter. Management made simpler.
 
-A digital attendance management platform designed to simplify classroom attendance, student management, and teacher workflows.
+A modern digital attendance management platform designed to simplify classroom attendance, student management, and teacher workflows.
 
-[🌐 Live Website](https://smart-attendance-shubh.vercel.app/) · [📦 Releases](https://github.com/Shubham07jee/smart-attendance/releases) · [🐛 Report an Issue](https://github.com/Shubham07jee/smart-attendance/issues)
+[🌐 Live Website](https://smart-attendance-shubh.vercel.app/) · [📦 Download Android App](https://github.com/Shubham07jee/smart-attendance/releases/tag/v1.0.0) · [🐛 Report an Issue](https://github.com/Shubham07jee/smart-attendance/issues)
 
 ![React](https://img.shields.io/badge/React-TypeScript-blue?logo=react)
 ![Vite](https://img.shields.io/badge/Built%20with-Vite-646CFF?logo=vite)
 ![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E?logo=supabase)
 ![Capacitor](https://img.shields.io/badge/Android-Capacitor-119EFF?logo=capacitor)
+![Release](https://img.shields.io/badge/Release-v1.0.0-success)
 ![Status](https://img.shields.io/badge/Status-Active-success)
 
 </div>
@@ -25,62 +26,103 @@ A digital attendance management platform designed to simplify classroom attendan
 
 **Smart Attendance** is a digital attendance management system that brings essential classroom operations into one centralized platform.
 
-It helps teachers manage students, record attendance, generate QR-based check-in sessions, and maintain their profiles through a responsive web application and Android application.
+Built for a simpler and more organized attendance experience, it helps teachers manage student records, track attendance, generate QR-based check-in sessions, and maintain their profiles.
 
-The goal is to make attendance management simpler, more organized, and accessible.
-
----
+The platform is available as a responsive web application and an Android application.
 
 ## ✨ Key Features
 
 | Feature | Description |
-|:---|:---|
-| 🔐 **Teacher Authentication** | Teacher registration, sign-in, and password recovery |
-| 📊 **Dashboard** | Centralized attendance and classroom overview |
-| 👨‍🎓 **Student Management** | Add, search, and manage student records |
-| ✅ **Attendance Tracking** | Record Present, Absent, Late, and Excused statuses |
-| 📱 **QR Attendance** | Generate QR codes for student check-in |
-| 📑 **Excel Export** | Export attendance information into Excel |
-| 👤 **Profile Management** | Update teacher details and profile picture |
-| ☁️ **Cloud Integration** | Supabase authentication, database, and storage |
-| 📲 **Android Support** | Android application powered by Capacitor |
+|---|---|
+| 🔐 Teacher Authentication | Registration, login, and password recovery |
+| 📊 Dashboard | Centralized classroom and attendance overview |
+| 👨‍🎓 Student Management | Add, search, and manage student records |
+| ✅ Attendance Tracking | Record Present, Absent, Late, and Excused statuses |
+| 📱 QR Attendance | QR-based student check-in workflow |
+| 📑 Excel Export | Export attendance records into structured Excel workbooks |
+| 📤 Native Android Sharing | Share exported Excel files using the Android sharing interface |
+| 👤 Profile Management | Update teacher details and profile pictures |
+| ☁️ Cloud Integration | Supabase authentication, database, and storage |
+| 📲 Android Support | Native Android integration powered by Capacitor |
 
 ---
 
-## 🖥️ Application Preview
+# 🖥️ Application Showcase
 
-Explore the application:
+## Desktop Web Application
 
-[**Open Smart Attendance Live →**](https://smart-attendance-shubh.vercel.app/)
+Explore the Smart Attendance web application and its classroom management interface.
 
-### 📊 Teacher Dashboard
+### 01. Teacher Dashboard
 
 <div align="center">
-<img src="screenshots/dashboard.png" alt="Smart Attendance Dashboard" width="95%" />
+<img src="screenshots/dashboard.png" alt="Smart Attendance Desktop Dashboard" width="95%" />
 </div>
 
-### ✅ Attendance Management
+### 02. Attendance Management
 
 <div align="center">
-<img src="screenshots/attendance.png" alt="Smart Attendance Attendance Management" width="95%" />
+<img src="screenshots/attendance.png" alt="Smart Attendance Desktop Attendance Management" width="95%" />
 </div>
 
-### 📱 QR-Based Attendance
+### 03. QR-Based Attendance
 
 <div align="center">
-<img src="screenshots/qr-attendance.png" alt="Smart Attendance QR Attendance" width="95%" />
+<img src="screenshots/qr-attendance.png" alt="Smart Attendance Desktop QR Attendance" width="95%" />
 </div>
 
-### 👤 Teacher Profile
+### 04. Teacher Profile
 
 <div align="center">
-<img src="screenshots/profile.png" alt="Smart Attendance Teacher Profile" width="95%" />
+<img src="screenshots/profile.png" alt="Smart Attendance Desktop Teacher Profile" width="95%" />
 </div>
 
-### 🔐 Teacher Registration
+### 05. Teacher Registration
 
 <div align="center">
-<img src="screenshots/signup.png" alt="Smart Attendance Teacher Registration" width="95%" />
+<img src="screenshots/signup.png" alt="Smart Attendance Desktop Registration" width="95%" />
+</div>
+
+---
+
+## 📱 Mobile Android Application
+
+Smart Attendance also delivers a mobile experience powered by Capacitor.
+
+### 01. Mobile Login
+
+<div align="center">
+<img src="screenshots-mobile/01-login.jpg" alt="Smart Attendance Mobile Login" width="280" />
+</div>
+
+### 02. Mobile Dashboard
+
+<div align="center">
+<img src="screenshots-mobile/02-dashboard.jpg" alt="Smart Attendance Mobile Dashboard" width="280" />
+</div>
+
+### 03. Student Management
+
+<div align="center">
+<img src="screenshots-mobile/03-students.jpg" alt="Mobile Student Management" width="280" />
+</div>
+
+### 04. Attendance Management
+
+<div align="center">
+<img src="screenshots-mobile/04-attendance.jpg" alt="Mobile Attendance Management" width="280" />
+</div>
+
+### 05. QR-Based Attendance
+
+<div align="center">
+<img src="screenshots-mobile/05-qr-attendance.jpg" alt="Mobile QR Attendance" width="280" />
+</div>
+
+### 06. Excel Export
+
+<div align="center">
+<img src="screenshots-mobile/06-excel-export.jpg" alt="Mobile Excel Export and Android Sharing" width="280" />
 </div>
 
 ---
@@ -88,7 +130,7 @@ Explore the application:
 ## 🛠️ Technology Stack
 
 | Category | Technology |
-|:---|:---|
+|---|---|
 | Frontend | React, TypeScript |
 | Build Tool | Vite |
 | Styling | CSS |
@@ -97,25 +139,10 @@ Explore the application:
 | Database | Supabase PostgreSQL |
 | File Storage | Supabase Storage |
 | Android Integration | Capacitor |
+| Excel Generation | SheetJS (xlsx) |
 | Icons | Lucide React |
 
----
-
 ## 🏗️ System Architecture
-
-<div align="center">
-
-| Layer | Responsibility |
-|:---|:---|
-| 👨‍🏫 **Teacher** | Uses the attendance management platform |
-| 🖥️ **Frontend** | React + TypeScript interface |
-| ⚙️ **Application Services** | Handles application operations |
-| ☁️ **Supabase** | Authentication, database, and storage |
-| 📱 **Android** | Mobile application through Capacitor |
-
-</div>
-
-### Application Flow
 
 <div align="center">
 
@@ -123,11 +150,15 @@ Explore the application:
 
 ⬇️
 
-**SMART ATTENDANCE**
+**SMART ATTENDANCE APPLICATION**
 
 ⬇️
 
 **REACT + TYPESCRIPT**
+
+⬇️
+
+**APPLICATION SERVICES**
 
 ⬇️
 
@@ -137,43 +168,11 @@ Explore the application:
 
 **AUTHENTICATION · DATABASE · STORAGE**
 
+⬇️
+
+**WEB APPLICATION + ANDROID APPLICATION**
+
 </div>
-
----
-
-## 📂 Project Structure
-
-```text
-smart-attendance/
-│
-├── android/                  # Native Android project
-│
-├── legacy/                   # Legacy project files
-│
-├── src/                      # React application source
-│
-├── supabase/
-│   └── migrations/           # Database SQL migrations
-│
-├── screenshots/
-│   ├── README.md
-│   ├── dashboard.png
-│   ├── attendance.png
-│   ├── profile.png
-│   ├── signup.png
-│   └── qr-attendance.png
-│
-├── app-icon.png              # Application logo
-│
-├── .env.example              # Environment template
-├── .gitignore
-├── capacitor.config.ts       # Capacitor configuration
-├── index.html
-├── package.json
-├── package-lock.json
-├── vite.config.ts
-└── README.md
-```
 
 ---
 
@@ -208,7 +207,7 @@ npm install
 
 ### 4. Configure Environment Variables
 
-Create a file named `.env.local` in the root directory.
+Create a file named `.env.local` in the project root.
 
 Add your Supabase credentials:
 
@@ -219,13 +218,13 @@ VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 
 Replace the placeholders with your actual Supabase project URL and publishable key.
 
-**Important:** Never expose your Supabase secret key or service-role key in frontend code. Never upload `.env.local` to GitHub.
+**Security:** Never expose your Supabase secret key or service-role key in frontend code. Never commit `.env.local` to GitHub.
 
 ### 5. Configure Supabase
 
 1. Create a Supabase project.
 2. Open the SQL Editor.
-3. Apply the migrations in the correct order:
+3. Apply the database migrations in the correct order:
    - `001_initial_schema.sql`
    - `002_qr_profile_features.sql`
 4. Configure the required authentication settings.
@@ -237,7 +236,7 @@ Replace the placeholders with your actual Supabase project URL and publishable k
 npm run dev
 ```
 
-Open the local URL shown in your terminal.
+Open the local URL displayed in your terminal.
 
 Usually:
 
@@ -255,56 +254,70 @@ The production frontend files are generated in the `dist/` directory.
 
 ---
 
-## 📱 Android Application
+## 📲 Android Application
 
-Smart Attendance also supports Android through Capacitor.
+Smart Attendance supports Android through Capacitor.
 
-### Requirements
+### Download the Latest Release
+
+<div align="center">
+
+### Smart Attendance v1.0.0
+
+**First Official Release**
+
+[⬇️ Download Android APK](https://github.com/Shubham07jee/smart-attendance/releases/tag/v1.0.0)
+
+</div>
+
+### Installation
+
+1. Open the GitHub Releases page.
+2. Download `app-release.apk`.
+3. Open the downloaded APK on your Android device.
+4. Allow installation from the relevant source if Android requests permission.
+5. Install and launch Smart Attendance.
+
+*This is a directly distributed Android APK, not a Play Store release.*
+
+### Build Android Locally
+
+Requirements:
 
 - Android Studio
 - Android SDK
 - Compatible Java Development Kit
 
-### Build and Synchronize
-
-Run these commands from the project root.
-
-**Build the web application:**
+Build and synchronize the application:
 
 ```bash
 npm run build
-```
-
-**Synchronize Android assets:**
-
-```bash
 npx cap sync android
-```
-
-**Open Android Studio:**
-
-```bash
 npx cap open android
 ```
 
-You can then build and run the Android application using Android Studio.
+You can then build and run the Android application through Android Studio.
 
 ---
 
-## 🔒 Security
+## 🔐 Security
 
 - Teacher authentication is managed through Supabase Auth.
-- Database access uses Row Level Security (RLS) policies.
+- Database access should be protected through appropriate Row Level Security policies.
 - Private credentials must never be committed to the repository.
-- QR-based check-in should be combined with suitable identity verification and server-side validation for real-world deployments.
+- QR-based check-in should use appropriate identity verification and server-side validation in real-world deployments.
 
 ---
 
 ## 📦 Releases
 
-Android builds and version history will be available through GitHub Releases.
+All official versions and Android builds are available through GitHub Releases.
 
-[**Explore Smart Attendance Releases →**](https://github.com/Shubham07jee/smart-attendance/releases)
+| Version | Description |
+|---|---|
+| [v1.0.0](https://github.com/Shubham07jee/smart-attendance/releases/tag/v1.0.0) | First Official Release |
+
+[**Explore All Releases →**](https://github.com/Shubham07jee/smart-attendance/releases)
 
 ---
 
@@ -323,7 +336,7 @@ Android builds and version history will be available through GitHub Releases.
 Contributions, suggestions, and bug reports are welcome.
 
 1. Fork the repository.
-2. Create a new feature branch.
+2. Create a feature branch.
 3. Make your changes.
 4. Test your changes.
 5. Submit a pull request.
